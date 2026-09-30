@@ -2,6 +2,7 @@ import express from 'express'
 import bcrypt from 'bcrypt'
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit'
 import db from './db.js'
+import { todayInTimezone, seasonRange } from './dates.js'
 import {
   readUsername,
   readDisplayName,
@@ -17,6 +18,7 @@ const PASSWORD_ROUNDS = 12
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', PASSWORD_ROUNDS)
 
 const findUserById = db.prepare('SELECT * FROM users WHERE id = ?')
+const markIntroSeen = db.prepare('UPDATE users SET intro_seen = 1 WHERE id = ?')
 const findUserByUsername = db.prepare('SELECT * FROM users WHERE username = ?')
 const findUserByEmail = db.prepare('SELECT id FROM users WHERE email = ?')
 const insertUser = db.prepare(`
@@ -65,6 +67,11 @@ const signupLimiter = rateLimit({
   message: { error: 'Too many sign up attempts. Try again in an hour.' },
 })
 
+function shouldShowIntro(user) {
+  const today = todayInTimezone(user.timezone)
+  return user.intro_seen === 0 && today >= seasonRange(today).start
+}
+
 export function userToJson(user) {
   return {
     id: user.id,
@@ -74,6 +81,7 @@ export function userToJson(user) {
     timezone: user.timezone,
     avatarColor: user.avatar_color,
     createdAt: user.created_at,
+    showIntro: shouldShowIntro(user),
   }
 }
 
@@ -192,6 +200,11 @@ router.patch('/me', requireAuth, (req, res) => {
   }
 
   updateUser.run(displayName.value, timezone.value, avatarColor.value, req.user.id)
+  res.json({ user: userToJson(findUserById.get(req.user.id)) })
+})
+
+router.post('/me/intro', requireAuth, (req, res) => {
+  markIntroSeen.run(req.user.id)
   res.json({ user: userToJson(findUserById.get(req.user.id)) })
 })
 

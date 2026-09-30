@@ -20,6 +20,7 @@ scripts/backup.sh    Backs up the database to backups/
 scripts/restore.sh   Puts a backup back in place
 scripts/deploy.sh    Backs up, pulls from GitHub, rebuilds and checks health
 scripts/reset-password.sh  Gives someone a temporary password
+scripts/season-reset.sh    Wipes all goals, check-offs and Board posts (keeps accounts)
 .env.example         Copy to .env and fill in
 ```
 

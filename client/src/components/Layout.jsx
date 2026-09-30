@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../AuthContext.jsx'
 import { api } from '../api.js'
 import { syncPush } from '../push.js'
 import { Avatar } from './PersonRow.jsx'
+import Intro from './Intro.jsx'
 import { AccountIcon, BoardIcon, CalendarIcon, FriendsIcon, TodayIcon } from './Icons.jsx'
 
 const tabs = [
@@ -211,11 +212,29 @@ export default function Layout() {
   const navigate = useNavigate()
   const [linkStatus, setLinkStatus] = useState('connecting')
   const [hasUnreadPosts, setHasUnreadPosts] = useState(false)
+  const { user, setUser } = useAuth()
+  const [introOpen, setIntroOpen] = useState(user.showIntro)
   const boardUnread = hasUnreadPosts && location.pathname !== '/board'
 
   useEffect(() => {
     syncPush().catch(() => {})
+    function handleIntro() {
+      setIntroOpen(true)
+    }
+    window.addEventListener('winterarc:intro', handleIntro)
+    return () => window.removeEventListener('winterarc:intro', handleIntro)
   }, [])
+
+  const closeIntro = useCallback(() => {
+    setIntroOpen(false)
+    if (user.showIntro) {
+      api('/me/intro', { method: 'POST' })
+        .then((data) => setUser(data.user))
+        .catch(() => {})
+    }
+  }, [user.showIntro, setUser])
+
+  const intro = introOpen && <Intro onClose={closeIntro} />
 
   useEffect(() => {
     let latestRequest = 0
@@ -321,6 +340,7 @@ export default function Layout() {
         <div key={location.pathname} className="animate-page-in">
           <Outlet />
         </div>
+        {intro}
       </div>
     )
   }
@@ -329,6 +349,7 @@ export default function Layout() {
     <div className="min-h-dvh pb-[calc(4.5rem+env(safe-area-inset-bottom))]">
       <Outlet />
       <MobileTabs boardUnread={boardUnread} />
+      {intro}
     </div>
   )
 }

@@ -124,6 +124,14 @@ export default function Account() {
 
       <ManageFriends />
 
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new Event('winterarc:intro'))}
+        className="mt-8 h-12 w-full rounded-xl border border-white/10 text-[15px] font-medium text-steel-200 transition active:scale-[0.98] active:bg-white/5"
+      >
+        Watch the intro
+      </button>
+
       <p className="mt-8 px-1 text-sm text-steel-500">Signed in as {user.email}</p>
 
       <div className="mt-4 flex flex-col gap-3">

@@ -92,7 +92,7 @@ function postsToJson(rows, viewer) {
     createdAt: row.created_at,
     day: todayInTimezone(viewer.timezone, new Date(row.created_at)),
     isYours: row.user_id === viewer.id,
-    photo: row.photo ? { width: row.photo_width, height: row.photo_height } : null,
+    photo: row.photo ? { width: row.photo_width, height: row.photo_height, version: row.photo.slice(0, 8) } : null,
     user: { id: row.user_id, username: row.username, displayName: row.display_name, avatarColor: row.avatar_color },
     reactions: REACTION_KINDS.map((kind) => {
       const people = reactionRows.filter((reaction) => reaction.post_id === row.id && reaction.kind === kind)

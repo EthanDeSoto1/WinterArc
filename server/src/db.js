@@ -108,6 +108,9 @@ const migrations = [
   ALTER TABLE users ADD COLUMN remind_midday_hour INTEGER NOT NULL DEFAULT 12;
   ALTER TABLE users ADD COLUMN remind_evening_hour INTEGER NOT NULL DEFAULT 20;
   `,
+  `
+  ALTER TABLE users ADD COLUMN intro_seen INTEGER NOT NULL DEFAULT 0;
+  `,
 ]
 
 const currentVersion = db.pragma('user_version', { simple: true })

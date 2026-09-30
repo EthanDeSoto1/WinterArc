@@ -83,7 +83,7 @@ function PhotoViewer({ post, onClose }) {
         <CrossIcon className="size-5" />
       </button>
       <img
-        src={`/api/posts/${post.id}/photo`}
+        src={`/api/posts/${post.id}/photo?v=${post.photo.version}`}
         alt={photoAlt(post)}
         width={post.photo.width}
         height={post.photo.height}
@@ -124,7 +124,7 @@ function PostCard({ post, board, me, timezone, onReact, onDelete, onChange, onEr
           className="mt-3 block w-full cursor-zoom-in rounded-xl transition active:opacity-80"
         >
           <img
-            src={`/api/posts/${post.id}/photo`}
+            src={`/api/posts/${post.id}/photo?v=${post.photo.version}`}
             alt=""
             width={post.photo.width}
             height={post.photo.height}
