@@ -4,6 +4,7 @@ import { api } from '../api.js'
 import { useAuth } from '../AuthContext.jsx'
 import Page from '../components/Page.jsx'
 import ManageFriends from '../components/ManageFriends.jsx'
+import AvatarColorPicker from '../components/AvatarColorPicker.jsx'
 import { FormError, PrimaryButton, SelectField, TextField } from '../components/Form.jsx'
 import { deviceTimezone } from '../dates.js'
 
@@ -110,6 +111,8 @@ export default function Settings() {
           {saving ? 'Saving…' : 'Save changes'}
         </PrimaryButton>
       </form>
+
+      <AvatarColorPicker />
 
       <ManageFriends />
 

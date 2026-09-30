@@ -2,7 +2,15 @@ import express from 'express'
 import bcrypt from 'bcrypt'
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit'
 import db from './db.js'
-import { readUsername, readDisplayName, readEmail, readNewPassword, readTimezone, firstError } from './validation.js'
+import {
+  readUsername,
+  readDisplayName,
+  readEmail,
+  readNewPassword,
+  readTimezone,
+  readAvatarColor,
+  firstError,
+} from './validation.js'
 
 export const SESSION_COOKIE_NAME = 'winterarc.sid'
 const PASSWORD_ROUNDS = 12
@@ -15,7 +23,7 @@ const insertUser = db.prepare(`
   INSERT INTO users (username, display_name, email, password_hash, timezone)
   VALUES (?, ?, ?, ?, ?)
 `)
-const updateUser = db.prepare('UPDATE users SET display_name = ?, timezone = ? WHERE id = ?')
+const updateUser = db.prepare('UPDATE users SET display_name = ?, timezone = ?, avatar_color = ? WHERE id = ?')
 
 const loginLimiterPerAccount = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -51,6 +59,7 @@ export function userToJson(user) {
     displayName: user.display_name,
     email: user.email,
     timezone: user.timezone,
+    avatarColor: user.avatar_color,
     createdAt: user.created_at,
   }
 }
@@ -157,17 +166,19 @@ router.get('/me', requireAuth, (req, res) => {
 router.patch('/me', requireAuth, (req, res) => {
   const hasDisplayName = req.body.displayName !== undefined
   const hasTimezone = req.body.timezone !== undefined
-  if (!hasDisplayName && !hasTimezone) {
+  const hasAvatarColor = req.body.avatarColor !== undefined
+  if (!hasDisplayName && !hasTimezone && !hasAvatarColor) {
     return res.status(400).json({ error: 'Nothing to update' })
   }
   const displayName = hasDisplayName ? readDisplayName(req.body.displayName) : { value: req.user.display_name }
   const timezone = hasTimezone ? readTimezone(req.body.timezone) : { value: req.user.timezone }
-  const error = firstError([displayName, timezone])
+  const avatarColor = hasAvatarColor ? readAvatarColor(req.body.avatarColor) : { value: req.user.avatar_color }
+  const error = firstError([displayName, timezone, avatarColor])
   if (error) {
     return res.status(400).json({ error })
   }
 
-  updateUser.run(displayName.value, timezone.value, req.user.id)
+  updateUser.run(displayName.value, timezone.value, avatarColor.value, req.user.id)
   res.json({ user: userToJson(findUserById.get(req.user.id)) })
 })
 

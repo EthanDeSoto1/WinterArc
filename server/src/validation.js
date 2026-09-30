@@ -47,6 +47,15 @@ export function readNewPassword(value) {
   return { value }
 }
 
+export const AVATAR_COLORS = ['frost', 'glacier', 'arctic', 'aurora', 'nebula', 'ember', 'solstice', 'steel']
+
+export function readAvatarColor(value) {
+  if (!AVATAR_COLORS.includes(value)) {
+    return { error: 'Pick one of the available colors' }
+  }
+  return { value }
+}
+
 export function readTimezone(value) {
   if (typeof value !== 'string' || value.trim() === '') {
     return { error: 'Timezone is required' }

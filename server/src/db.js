@@ -23,6 +23,9 @@ const migrations = [
   ALTER TABLE goals ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
   UPDATE goals SET position = id;
   `,
+  `
+  ALTER TABLE users ADD COLUMN avatar_color TEXT NOT NULL DEFAULT 'frost';
+  `,
 ]
 
 const currentVersion = db.pragma('user_version', { simple: true })

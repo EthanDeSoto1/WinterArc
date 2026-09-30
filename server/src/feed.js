@@ -8,7 +8,7 @@ const FEED_LIMIT = 50
 const findFeed = db.prepare(`
   SELECT completions.id, completions.completed_on, completions.completed_at,
     goals.id AS goal_id, goals.title, goals.frequency,
-    users.id AS user_id, users.username, users.display_name, users.timezone
+    users.id AS user_id, users.username, users.display_name, users.avatar_color, users.timezone
   FROM completions
   JOIN goals ON goals.id = completions.goal_id
   JOIN users ON users.id = completions.user_id
@@ -29,7 +29,7 @@ function feedItemToJson(row, viewer) {
     completedAt: row.completed_at,
     day: todayInTimezone(viewer.timezone, completedAt),
     forYesterday: row.completed_on !== todayInTimezone(row.timezone, completedAt),
-    user: { id: row.user_id, username: row.username, displayName: row.display_name },
+    user: { id: row.user_id, username: row.username, displayName: row.display_name, avatarColor: row.avatar_color },
     goal: { id: row.goal_id, title: row.title, frequency: row.frequency },
   }
 }

@@ -6,11 +6,11 @@ import { goalsWithStatus, isFinishedToday } from './goals.js'
 
 const SEARCH_LIMIT = 20
 
-const findUserById = db.prepare('SELECT id, username, display_name FROM users WHERE id = ?')
-const findUserWithTimezone = db.prepare('SELECT id, username, display_name, timezone FROM users WHERE id = ?')
-const findUserByUsername = db.prepare('SELECT id, username, display_name FROM users WHERE username = ?')
+const findUserById = db.prepare('SELECT id, username, display_name, avatar_color FROM users WHERE id = ?')
+const findUserWithTimezone = db.prepare('SELECT id, username, display_name, avatar_color, timezone FROM users WHERE id = ?')
+const findUserByUsername = db.prepare('SELECT id, username, display_name, avatar_color FROM users WHERE username = ?')
 const searchUsers = db.prepare(`
-  SELECT id, username, display_name FROM users
+  SELECT id, username, display_name, avatar_color FROM users
   WHERE username GLOB ? AND id <> ?
   ORDER BY username
   LIMIT ${SEARCH_LIMIT}
@@ -21,23 +21,23 @@ const findFriendshipBetween = db.prepare(`
   WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)
 `)
 const findFriends = db.prepare(`
-  SELECT users.id, users.username, users.display_name, users.timezone
+  SELECT users.id, users.username, users.display_name, users.avatar_color, users.timezone
   FROM friendships JOIN users ON users.id = friendships.addressee_id
   WHERE friendships.requester_id = ? AND friendships.status = 'accepted'
   UNION ALL
-  SELECT users.id, users.username, users.display_name, users.timezone
+  SELECT users.id, users.username, users.display_name, users.avatar_color, users.timezone
   FROM friendships JOIN users ON users.id = friendships.requester_id
   WHERE friendships.addressee_id = ? AND friendships.status = 'accepted'
   ORDER BY display_name COLLATE NOCASE, username
 `)
 const findIncomingRequests = db.prepare(`
-  SELECT friendships.id, friendships.created_at, users.id AS user_id, users.username, users.display_name
+  SELECT friendships.id, friendships.created_at, users.id AS user_id, users.username, users.display_name, users.avatar_color
   FROM friendships JOIN users ON users.id = friendships.requester_id
   WHERE friendships.addressee_id = ? AND friendships.status = 'pending'
   ORDER BY friendships.created_at DESC, friendships.id DESC
 `)
 const findOutgoingRequests = db.prepare(`
-  SELECT friendships.id, friendships.created_at, users.id AS user_id, users.username, users.display_name
+  SELECT friendships.id, friendships.created_at, users.id AS user_id, users.username, users.display_name, users.avatar_color
   FROM friendships JOIN users ON users.id = friendships.addressee_id
   WHERE friendships.requester_id = ? AND friendships.status = 'pending'
   ORDER BY friendships.created_at DESC, friendships.id DESC
@@ -60,6 +60,7 @@ function publicUser(user) {
     id: user.id,
     username: user.username,
     displayName: user.display_name,
+    avatarColor: user.avatar_color,
   }
 }
 
@@ -102,7 +103,7 @@ function requestToJson(row) {
   return {
     id: row.id,
     createdAt: row.created_at,
-    user: { id: row.user_id, username: row.username, displayName: row.display_name },
+    user: { id: row.user_id, username: row.username, displayName: row.display_name, avatarColor: row.avatar_color },
   }
 }
 
