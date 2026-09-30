@@ -164,3 +164,29 @@ export function weeklyStreak(completedDates, timesPerWeek, today) {
   }
   return streak
 }
+
+export function finishedSeasonMonths(today) {
+  const season = seasonRange(today)
+  const year = season.start.slice(0, 4)
+  return ['10', '11', '12']
+    .map((month) => `${year}-${month}`)
+    .filter((month) => month < today.slice(0, 7))
+    .reverse()
+}
+
+export function summarizeMonth(weeks, month) {
+  const summary = { full: 0, partial: 0, low: 0 }
+  let done = 0
+  let total = 0
+  for (const week of weeks) {
+    for (const day of week.days) {
+      if (day.date.slice(0, 7) !== month || !(day.status in summary)) {
+        continue
+      }
+      summary[day.status]++
+      done += day.done.length
+      total += day.done.length + day.missed.length
+    }
+  }
+  return { ...summary, percent: total === 0 ? null : Math.floor((done * 100) / total) }
+}

@@ -55,7 +55,7 @@ export function areFriends(userIdA, userIdB) {
   return Boolean(friendship && friendship.status === 'accepted')
 }
 
-function publicUser(user) {
+export function publicUser(user) {
   return {
     id: user.id,
     username: user.username,

@@ -11,6 +11,8 @@ import {
   weeklyStreak,
   seasonRange,
   buildHistory,
+  finishedSeasonMonths,
+  summarizeMonth,
 } from '../src/dates.js'
 
 test('today flips at local midnight, not UTC midnight', () => {
@@ -177,4 +179,35 @@ test('weeks are met, missed or in progress, and a new goal is not held against i
   assert.equal(byStart('2026-10-12').status, 'met')
   assert.equal(byStart('2026-10-19').status, 'inProgress')
   assert.equal(byStart('2026-10-26').status, null)
+})
+
+test('a season month counts as finished only once the next month has started', () => {
+  assert.deepEqual(finishedSeasonMonths('2026-09-30'), [])
+  assert.deepEqual(finishedSeasonMonths('2026-10-31'), [])
+  assert.deepEqual(finishedSeasonMonths('2026-11-01'), ['2026-10'])
+  assert.deepEqual(finishedSeasonMonths('2026-12-15'), ['2026-11', '2026-10'])
+  assert.deepEqual(finishedSeasonMonths('2027-01-01'), ['2026-12', '2026-11', '2026-10'])
+  assert.deepEqual(finishedSeasonMonths('2027-03-10'), ['2026-12', '2026-11', '2026-10'])
+})
+
+test('month summary counts graded days and the share of daily check-offs', () => {
+  const goals = [
+    { id: 1, frequency: 'daily', timesPerWeek: null, startDate: '2026-09-20', endDate: null, dates: ['2026-10-30', '2026-10-31', '2026-11-01'] },
+    { id: 2, frequency: 'daily', timesPerWeek: null, startDate: '2026-09-20', endDate: null, dates: ['2026-10-31'] },
+    { id: 3, frequency: 'weekly', timesPerWeek: 2, startDate: '2026-09-20', endDate: null, dates: ['2026-10-29'] },
+  ]
+  const weeks = buildHistory(goals, '2026-10-01', '2026-12-31', '2026-11-02')
+  const october = summarizeMonth(weeks, '2026-10')
+  assert.equal(october.full, 1)
+  assert.equal(october.partial, 1)
+  assert.equal(october.low, 29)
+  assert.equal(october.percent, Math.floor((3 * 100) / 62))
+  const november = summarizeMonth(weeks, '2026-11')
+  assert.deepEqual(november, { full: 0, partial: 1, low: 0, percent: 50 })
+})
+
+test('month summary has no percent when there were no daily goals', () => {
+  const goals = [{ id: 1, frequency: 'weekly', timesPerWeek: 3, startDate: '2026-09-20', endDate: null, dates: ['2026-10-05'] }]
+  const weeks = buildHistory(goals, '2026-10-01', '2026-12-31', '2026-11-10')
+  assert.deepEqual(summarizeMonth(weeks, '2026-10'), { full: 0, partial: 0, low: 0, percent: null })
 })

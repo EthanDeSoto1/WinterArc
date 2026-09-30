@@ -1,7 +1,8 @@
 import express from 'express'
 import db from './db.js'
 import { requireAuth } from './auth.js'
-import { todayInTimezone, seasonRange, buildHistory } from './dates.js'
+import { publicUser } from './friends.js'
+import { todayInTimezone, seasonRange, buildHistory, finishedSeasonMonths, summarizeMonth } from './dates.js'
 
 const findAllGoals = db.prepare('SELECT * FROM goals WHERE user_id = ? ORDER BY position, id')
 const findCompletions = db.prepare(`
@@ -10,6 +11,13 @@ const findCompletions = db.prepare(`
   JOIN goals ON goals.id = completions.goal_id
   WHERE goals.user_id = ?
   ORDER BY completions.completed_on
+`)
+const findFriendsWithDetails = db.prepare(`
+  SELECT users.* FROM friendships JOIN users ON users.id = friendships.addressee_id
+  WHERE friendships.requester_id = ? AND friendships.status = 'accepted'
+  UNION ALL
+  SELECT users.* FROM friendships JOIN users ON users.id = friendships.requester_id
+  WHERE friendships.addressee_id = ? AND friendships.status = 'accepted'
 `)
 
 function dateOf(timestamp, timezone) {
@@ -69,10 +77,48 @@ function historyForUser(user) {
   }
 }
 
+function comparePeople(a, b) {
+  if (a.percent !== b.percent) {
+    if (a.percent === null) {
+      return 1
+    }
+    if (b.percent === null) {
+      return -1
+    }
+    return b.percent - a.percent
+  }
+  if (a.full !== b.full) {
+    return b.full - a.full
+  }
+  return a.user.displayName.localeCompare(b.user.displayName)
+}
+
+function friendsMonthly(viewer) {
+  const months = finishedSeasonMonths(todayInTimezone(viewer.timezone))
+  const people = [viewer, ...findFriendsWithDetails.all(viewer.id, viewer.id)]
+  const histories = people.map((person) => ({ person, weeks: historyForUser(person).weeks }))
+  return {
+    months: months.map((month) => ({
+      month,
+      people: histories
+        .map(({ person, weeks }) => ({
+          user: publicUser(person),
+          isYou: person.id === viewer.id,
+          ...summarizeMonth(weeks, month),
+        }))
+        .sort(comparePeople),
+    })),
+  }
+}
+
 const router = express.Router()
 
 router.get('/history', requireAuth, (req, res) => {
   res.json(historyForUser(req.user))
+})
+
+router.get('/history/friends', requireAuth, (req, res) => {
+  res.json(friendsMonthly(req.user))
 })
 
 export default router

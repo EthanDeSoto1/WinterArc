@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
+import { Link } from 'react-router'
 import Page from '../components/Page.jsx'
-import { SectionTitle } from '../components/PersonRow.jsx'
+import { Avatar, SectionTitle } from '../components/PersonRow.jsx'
+import { Segmented } from '../components/Form.jsx'
 import { CheckIcon, CrossIcon } from '../components/Icons.jsx'
-import { ErrorState, LoadingState } from '../components/States.jsx'
+import { EmptyState, ErrorState, LoadingState } from '../components/States.jsx'
 import { dayOfMonth, formatDayLabel, formatMonthName, formatShortDate } from '../dates.js'
 
 const DAY_STYLES = {
@@ -222,7 +224,7 @@ function Summary({ weeks }) {
   )
 }
 
-export default function History() {
+function MyHistory() {
   const [data, setData] = useState(null)
   const [status, setStatus] = useState('loading')
   const [loadError, setLoadError] = useState('')
@@ -246,13 +248,11 @@ export default function History() {
     loadHistory()
   }, [])
 
-  if (status !== 'ready') {
-    return (
-      <Page eyebrow="Winter Arc" title="History">
-        {status === 'loading' && <LoadingState message="Loading your history…" />}
-        {status === 'error' && <ErrorState message={loadError} onRetry={loadHistory} />}
-      </Page>
-    )
+  if (status === 'loading') {
+    return <LoadingState message="Loading your history…" />
+  }
+  if (status === 'error') {
+    return <ErrorState message={loadError} onRetry={loadHistory} />
   }
 
   const goalsById = Object.fromEntries(data.goals.map((goal) => [goal.id, goal]))
@@ -266,7 +266,7 @@ export default function History() {
   }
 
   return (
-    <Page eyebrow="Winter Arc" title="History">
+    <>
       <Summary weeks={data.weeks} />
 
       <SectionTitle>Calendar</SectionTitle>
@@ -316,6 +316,146 @@ export default function History() {
       })}
 
       <p className="mt-6 px-1 text-center text-xs text-steel-500">Tap a day or a week to see what you did.</p>
+    </>
+  )
+}
+
+function monthName(month) {
+  return formatMonthName(`${month}-01`)
+}
+
+function BoardRow({ person, rank }) {
+  return (
+    <li
+      className={`flex min-h-[4.25rem] items-center gap-3 rounded-2xl border bg-ink-900/70 py-2 pr-4 pl-3 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)] ${
+        person.isYou ? 'border-ice-300/25' : 'border-white/[0.06]'
+      }`}
+    >
+      <span className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-steel-400">{rank || '–'}</span>
+      <Avatar user={person.user} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-medium text-ice-50">
+          {person.user.displayName}
+          {person.isYou && <span className="ml-1.5 text-xs font-normal text-steel-500">You</span>}
+        </p>
+        <p className="mt-1 flex items-center gap-3 text-xs tabular-nums text-steel-400">
+          {['full', 'partial', 'low'].map((dayStatus) => (
+            <span key={dayStatus} className="flex items-center gap-1.5">
+              <span className={`size-1.5 rounded-full ${DAY_STYLES[dayStatus].dot}`} />
+              {person[dayStatus]}
+              <span className="sr-only">{DAY_STYLES[dayStatus].label} days</span>
+            </span>
+          ))}
+        </p>
+      </div>
+      {person.percent === null ? (
+        <span className="shrink-0 text-xs text-steel-500">No daily goals</span>
+      ) : (
+        <span className="shrink-0 text-[22px] font-semibold tabular-nums text-ice-50">{person.percent}%</span>
+      )}
+    </li>
+  )
+}
+
+function FriendsMonthly() {
+  const [months, setMonths] = useState([])
+  const [month, setMonth] = useState(null)
+  const [status, setStatus] = useState('loading')
+  const [loadError, setLoadError] = useState('')
+
+  function loadBoard() {
+    setStatus('loading')
+    api('/history/friends')
+      .then((result) => {
+        setMonths(result.months)
+        setMonth(result.months.length > 0 ? result.months[0].month : null)
+        setStatus('ready')
+      })
+      .catch((error) => {
+        setLoadError(error.message)
+        setStatus('error')
+      })
+  }
+
+  useEffect(() => {
+    loadBoard()
+  }, [])
+
+  if (status === 'loading') {
+    return <LoadingState message="Loading monthly results…" />
+  }
+  if (status === 'error') {
+    return <ErrorState message={loadError} onRetry={loadBoard} />
+  }
+  if (months.length === 0) {
+    return (
+      <EmptyState
+        title="First results on November 1"
+        message="When a month ends, you'll see how you and your friends did, ranked by the share of daily goals checked off."
+      />
+    )
+  }
+
+  const shown = months.find((item) => item.month === month) || months[0]
+  const people = shown.people
+
+  function rankOf(person) {
+    if (person.percent === null) {
+      return null
+    }
+    return 1 + people.filter((other) => other.percent !== null && other.percent > person.percent).length
+  }
+
+  return (
+    <>
+      {months.length > 1 && (
+        <div className="mb-6">
+          <Segmented
+            label="Month"
+            value={shown.month}
+            onChange={setMonth}
+            options={[...months].reverse().map((item) => ({ value: item.month, label: monthName(item.month) }))}
+          />
+        </div>
+      )}
+      <SectionTitle>{monthName(shown.month)} results</SectionTitle>
+      <ol className="flex flex-col gap-2">
+        {people.map((person) => (
+          <BoardRow key={person.user.id} person={person} rank={rankOf(person)} />
+        ))}
+      </ol>
+      {people.length === 1 && (
+        <p className="mt-4 px-1 text-center text-sm text-steel-400">
+          <Link to="/add-friend" className="inline-flex min-h-11 items-center font-semibold text-ice-200 underline-offset-4 active:underline">
+            Add friends
+          </Link>{' '}
+          to see how they did.
+        </p>
+      )}
+      <p className="mt-6 px-1 text-center text-xs text-steel-500">
+        Ranked by the share of daily goals checked off. Weekly goals aren't counted.
+      </p>
+    </>
+  )
+}
+
+export default function History() {
+  const [view, setView] = useState('mine')
+
+  return (
+    <Page eyebrow="Winter Arc" title="History">
+      <div className="mb-6">
+        <Segmented
+          label="Whose history"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'mine', label: 'Mine' },
+            { value: 'friends', label: 'Friends' },
+          ]}
+        />
+      </div>
+      {view === 'mine' ? <MyHistory /> : <FriendsMonthly />}
     </Page>
   )
 }
