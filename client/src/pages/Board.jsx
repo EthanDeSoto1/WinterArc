@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { api } from '../api.js'
 import { useAuth } from '../AuthContext.jsx'
 import Page from '../components/Page.jsx'
@@ -318,7 +319,7 @@ export default function Board() {
   }
 
   return (
-    <Page eyebrow="Everyone on Winter Arc" title="Board">
+    <Page eyebrow="You and your friends" title="Board">
       {status === 'loading' && <LoadingState message="Loading posts…" />}
       {status === 'error' && <ErrorState message={loadError} onRetry={() => loadBoard(true)} />}
       {status === 'ready' && (
@@ -326,7 +327,11 @@ export default function Board() {
           <PostComposer onPosted={handlePosted} />
           {posts.length === 0 && (
             <div className="mt-6">
-              <EmptyState title="Nothing posted yet" message="Share a workout, a win, or a tough day. Everyone can react to keep you going." />
+              <EmptyState title="Nothing posted yet" message="Share a workout, a win, or a tough day. Your friends can react to keep you going.">
+                <Link to="/friends?add=1" className="flex min-h-11 items-center text-sm font-semibold text-ice-300">
+                  Add friends
+                </Link>
+              </EmptyState>
             </div>
           )}
           {posts.length > 0 && (

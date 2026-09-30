@@ -46,11 +46,6 @@ const deleteOwnSubscription = db.prepare('DELETE FROM push_subscriptions WHERE e
 const deleteSubscription = db.prepare('DELETE FROM push_subscriptions WHERE id = ?')
 const insertSent = db.prepare('INSERT INTO sent_notifications (user_id, kind, day) VALUES (?, ?, ?) ON CONFLICT DO NOTHING')
 const deleteOldSent = db.prepare("DELETE FROM sent_notifications WHERE day < date('now', '-7 days')")
-const findPostReaders = db.prepare(`
-  SELECT DISTINCT users.id FROM users
-  JOIN push_subscriptions ON push_subscriptions.user_id = users.id
-  WHERE users.notify_posts = 1 AND users.id != ?
-`)
 const friendsWhere = `
   users.id IN (
     SELECT addressee_id FROM friendships WHERE requester_id = ? AND status = 'accepted'
@@ -58,6 +53,7 @@ const friendsWhere = `
     SELECT requester_id FROM friendships WHERE addressee_id = ? AND status = 'accepted'
   )
 `
+const findPostReaders = db.prepare(`SELECT id FROM users WHERE notify_posts = 1 AND ${friendsWhere}`)
 const findFriendsWantingDone = db.prepare(`SELECT id FROM users WHERE notify_friend_done = 1 AND ${friendsWhere}`)
 const findFriendsWantingGoals = db.prepare(`SELECT id FROM users WHERE notify_friend_goals = 1 AND ${friendsWhere}`)
 
@@ -122,7 +118,7 @@ export function notifyNewPost(author, body, hasPhoto) {
     body: body ? preview(body) : hasPhoto ? 'Shared a photo' : '',
     url: '/board',
   }
-  for (const reader of findPostReaders.all(author.id)) {
+  for (const reader of findPostReaders.all(author.id, author.id)) {
     sendToUser(reader.id, message)
   }
 }

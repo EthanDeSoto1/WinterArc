@@ -6,7 +6,7 @@ import db from './db.js'
 import { requireAuth } from './auth.js'
 import { notifyBoard, notifyBoardSeen } from './events.js'
 import { notifyNewPost, notifyReaction, notifyComment } from './push.js'
-import { publicUser } from './friends.js'
+import { publicUser, areFriends } from './friends.js'
 import {
   readId,
   readPostBody,
@@ -31,6 +31,12 @@ const findPosts = db.prepare(`
   FROM posts
   JOIN users ON users.id = posts.user_id
   WHERE posts.id < ?
+    AND (posts.user_id = ?
+      OR posts.user_id IN (
+        SELECT addressee_id FROM friendships WHERE requester_id = ? AND status = 'accepted'
+        UNION
+        SELECT requester_id FROM friendships WHERE addressee_id = ? AND status = 'accepted'
+      ))
   ORDER BY posts.id DESC
   LIMIT ${PAGE_SIZE + 1}
 `)
@@ -75,7 +81,16 @@ const saveReaction = db.prepare(`
     SET kind = excluded.kind, created_at = excluded.created_at
     WHERE kind <> excluded.kind
 `)
-const hasUnreadPosts = db.prepare('SELECT EXISTS (SELECT 1 FROM posts WHERE id > ? AND user_id <> ?) AS unread')
+const hasUnreadPosts = db.prepare(`
+  SELECT EXISTS (
+    SELECT 1 FROM posts
+    WHERE id > ? AND user_id IN (
+        SELECT addressee_id FROM friendships WHERE requester_id = ? AND status = 'accepted'
+        UNION
+        SELECT requester_id FROM friendships WHERE addressee_id = ? AND status = 'accepted'
+      )
+  ) AS unread
+`)
 const markBoardSeen = db.prepare(
   'UPDATE users SET board_seen_post_id = ? WHERE id = ? AND board_seen_post_id < ? AND ? <= (SELECT coalesce(max(id), 0) FROM posts)'
 )
@@ -128,7 +143,7 @@ function loadVisiblePost(req, res) {
     return null
   }
   const post = findPost.get(id.value)
-  if (!post) {
+  if (!post || (post.user_id !== req.user.id && !areFriends(post.user_id, req.user.id))) {
     res.status(404).json({ error: 'That post no longer exists' })
     return null
   }
@@ -155,7 +170,7 @@ router.get('/posts', requireAuth, (req, res) => {
   if (before.error) {
     return res.status(400).json({ error: before.error })
   }
-  const rows = findPosts.all(before.value)
+  const rows = findPosts.all(before.value, req.user.id, req.user.id, req.user.id)
   const today = todayInTimezone(req.user.timezone)
   res.json({
     today,
@@ -166,7 +181,7 @@ router.get('/posts', requireAuth, (req, res) => {
 })
 
 router.get('/posts/unread', requireAuth, (req, res) => {
-  res.json({ unread: hasUnreadPosts.get(req.user.board_seen_post_id, req.user.id).unread === 1 })
+  res.json({ unread: hasUnreadPosts.get(req.user.board_seen_post_id, req.user.id, req.user.id).unread === 1 })
 })
 
 router.post('/posts/seen', requireAuth, (req, res) => {
@@ -269,7 +284,7 @@ router.post('/posts/:id/comments', requireAuth, (req, res) => {
     return res.status(400).json({ error: body.error })
   }
   insertComment.run(post.id, req.user.id, body.value)
-  notifyBoard(req.user.id)
+  notifyBoard(post.user_id)
   notifyComment(post, req.user, body.value)
   res.status(201).json({ post: postsToJson([post], req.user)[0] })
 })
@@ -291,7 +306,7 @@ router.delete('/posts/:id/comments/:commentId', requireAuth, (req, res) => {
     return res.status(403).json({ error: 'You can only delete your own comments or comments on your posts' })
   }
   deleteComment.run(comment.id)
-  notifyBoard(req.user.id)
+  notifyBoard(post.user_id)
   res.json({ post: postsToJson([post], req.user)[0] })
 })
 

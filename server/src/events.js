@@ -36,8 +36,10 @@ export function notifyActivity(userId) {
 }
 
 export function notifyFriendship(userIdA, userIdB) {
-  sendTo(userIdA, 'activity', { userId: null })
-  sendTo(userIdB, 'activity', { userId: null })
+  for (const id of [userIdA, userIdB]) {
+    sendTo(id, 'activity', { userId: null })
+    sendTo(id, 'board', { userId: null })
+  }
 }
 
 export function notifyBoardSeen(userId) {
@@ -45,9 +47,7 @@ export function notifyBoardSeen(userId) {
 }
 
 export function notifyBoard(userId) {
-  for (const id of connectionsByUser.keys()) {
-    sendTo(id, 'board', { userId })
-  }
+  sendToUserAndFriends(userId, 'board')
 }
 
 export function closeAllStreams() {

@@ -146,7 +146,7 @@ export default function PostComposer({ onPosted }) {
           )}
         </button>
         <p className="min-w-0 flex-1 text-xs text-steel-500">
-          {remaining <= 100 ? `${remaining} characters left` : 'Everyone on Winter Arc sees posts.'}
+          {remaining <= 100 ? `${remaining} characters left` : 'Only you and your friends see posts.'}
         </p>
         <PrimaryButton type="submit" disabled={!canPost} className="shrink-0">
           {posting ? (photo ? 'Uploading…' : 'Posting…') : 'Post'}

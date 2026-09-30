@@ -258,7 +258,7 @@ const SLIDES = [
   {
     eyebrow: 'Board',
     title: 'Share the grind',
-    text: 'Post workouts, wins and photos for everyone on Winter Arc. React and comment to keep people going.',
+    text: 'Post workouts, wins and photos for your friends. React and comment to keep each other going.',
     Scene: BoardScene,
   },
   {
