@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+  --color-ink-950: #030304;
+  --color-ink-900: #0a0b0d;
+  --color-ink-850: #0e1013;
+  --color-ink-800: #13151a;
+  --color-ink-700: #1c1f25;
+  --color-ink-600: #2a2e36;
+
+  --color-steel-500: #6b7382;
+  --color-steel-400: #8e97a6;
+  --color-steel-300: #b3bbc7;
+  --color-steel-200: #d6dce4;
+
+  --color-ice-50: #f4f9ff;
+  --color-ice-100: #e4f2ff;
+  --color-ice-200: #cde8ff;
+  --color-ice-300: #aedbff;
+  --color-ice-400: #84c5ff;
+  --color-ice-500: #56acf5;
+
+  --animate-check-pop: check-pop 420ms cubic-bezier(0.3, 1.6, 0.5, 1);
+  --animate-ring-burst: ring-burst 600ms ease-out forwards;
+  --animate-draw-check: draw-check 300ms 80ms ease-out both;
+  --animate-fade-up: fade-up 260ms ease-out both;
+
+  @keyframes check-pop {
+    0% {
+      transform: scale(1);
+    }
+    35% {
+      transform: scale(0.82);
+    }
+    70% {
+      transform: scale(1.14);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes ring-burst {
+    0% {
+      transform: scale(0.8);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(2.2);
+      opacity: 0;
+    }
+  }
+
+  @keyframes draw-check {
+    from {
+      stroke-dashoffset: 22;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+html,
+body {
+  background-color: #000;
+  color: var(--color-steel-200);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 55% at 50% -12%, rgb(132 197 255 / 0.13), transparent 62%),
+    radial-gradient(60% 40% at 100% 0%, rgb(174 219 255 / 0.05), transparent 70%);
+}
+
+input,
+select,
+textarea {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

@@ -1,0 +1,111 @@
+# Winter Arc
+
+Track daily discipline goals with friends from Oct 1 to Jan 1.
+
+The whole app runs in one Docker container on the home server. Only people on your Tailscale network can reach it.
+
+> This README is filled in stage by stage. Sharing with friends, installing to the home screen and backups come in Stage 6.
+
+## Project layout
+
+```
+client/              React app (Vite, Tailwind)
+server/              Express API and SQLite database code
+server/src/schema.sql  Database tables, created automatically on start
+Dockerfile           Builds the client, then runs the server
+docker-compose.yml   Runs the container
+.env.example         Copy to .env and fill in
+```
+
+## 1. First-time setup on the server
+
+Run these on the Linux Mint server, inside the project folder (for example `~/winter-arc`).
+
+1. Create your settings file:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Put a long random session secret in it:
+
+   ```bash
+   sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" .env
+   ```
+
+3. Open `.env` with `nano .env` and set `INVITE_CODE` to a word only your friends will know. Leave it empty to let anyone on your tailnet sign up. Save with Ctrl+O, Enter, then exit with Ctrl+X.
+
+`.env` holds secrets. Never commit it or share it.
+
+## 2. Start, stop, logs, updates
+
+| What | Command |
+| --- | --- |
+| Build and start in the background | `docker compose up -d --build` |
+| Check it is running and healthy | `docker compose ps` |
+| Health check | `curl http://127.0.0.1:3000/api/health` |
+| Follow the logs (Ctrl+C to stop following) | `docker compose logs -f` |
+| Restart | `docker compose restart` |
+| Stop | `docker compose down` |
+| Update after code changes | `docker compose up -d --build` |
+
+`docker compose ps` shows `(healthy)` about 10 seconds after starting.
+
+The database lives in a Docker volume called `winter-arc_winter-arc-data`. It survives restarts, rebuilds and `docker compose down`. **Do not** run `docker compose down -v`, because `-v` deletes the volume and all data.
+
+The app only listens on `127.0.0.1:3000`, so nothing outside the server can reach that port directly. Tailscale provides the outside access in the next step.
+
+## 3. HTTPS on your tailnet with `tailscale serve`
+
+HTTPS is required for login cookies and for installing the app on phones.
+
+1. In the Tailscale admin console (https://login.tailscale.com/admin/dns):
+   - Under **MagicDNS**, click **Enable MagicDNS** if it is not already on.
+   - Under **HTTPS Certificates**, click **Enable HTTPS**.
+2. On the server, find your machine's full name:
+
+   ```bash
+   tailscale status --self --peers=false
+   ```
+
+   The address looks like `<machine-name>.<tailnet>.ts.net`.
+3. Point Tailscale at the app:
+
+   ```bash
+   sudo tailscale serve --bg 3000
+   ```
+
+   `--bg` keeps the setting saved, so it comes back by itself after a reboot. The first request can take a few seconds while Tailscale gets the certificate.
+4. Check it:
+
+   ```bash
+   tailscale serve status
+   ```
+
+   It should show `https://<machine-name>.<tailnet>.ts.net` proxying to `http://127.0.0.1:3000`.
+5. Open `https://<machine-name>.<tailnet>.ts.net` on any device signed in to your tailnet.
+
+To turn it off: `sudo tailscale serve reset`.
+
+Do **not** use `tailscale funnel`. Funnel puts the app on the public internet. `serve` keeps it inside your tailnet.
+
+## Local development (optional)
+
+With Node 22 or newer, create a `.env` in the project folder for development:
+
+```
+SESSION_SECRET=any-string-at-least-32-characters-long
+INVITE_CODE=
+COOKIE_SECURE=false
+```
+
+`COOKIE_SECURE=false` is only for plain `http://localhost` during development. Never set it on the server, where login cookies must stay HTTPS-only.
+
+Then, in two terminals:
+
+```bash
+cd server && npm install && npm run dev
+cd client && npm install && npm run dev
+```
+
+Open the address Vite prints. The client dev server passes `/api` requests through to the server on port 3000.

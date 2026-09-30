@@ -1,0 +1,16 @@
+name: winter-arc
+
+services:
+  app:
+    build: .
+    container_name: winter-arc
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - winter-arc-data:/data
+
+volumes:
+  winter-arc-data:
