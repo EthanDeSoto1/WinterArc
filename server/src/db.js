@@ -77,6 +77,30 @@ const migrations = [
   CREATE INDEX post_comments_post ON post_comments (post_id, id);
   CREATE INDEX post_comments_user ON post_comments (user_id);
   `,
+  `
+  CREATE TABLE push_subscriptions (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+  CREATE INDEX push_subscriptions_user ON push_subscriptions (user_id);
+  CREATE TABLE sent_notifications (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    day TEXT NOT NULL,
+    PRIMARY KEY (user_id, kind, day)
+  );
+  ALTER TABLE users ADD COLUMN notify_posts INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE users ADD COLUMN notify_my_posts INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE users ADD COLUMN notify_friend_done INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE users ADD COLUMN notify_friend_goals INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE users ADD COLUMN remind_morning INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE users ADD COLUMN remind_midday INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE users ADD COLUMN remind_evening INTEGER NOT NULL DEFAULT 1;
+  `,
 ]
 
 const currentVersion = db.pragma('user_version', { simple: true })

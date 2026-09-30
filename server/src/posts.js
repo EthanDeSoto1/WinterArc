@@ -5,6 +5,7 @@ import path from 'node:path'
 import db from './db.js'
 import { requireAuth } from './auth.js'
 import { notifyBoard } from './events.js'
+import { notifyNewPost, notifyReaction, notifyComment } from './push.js'
 import { publicUser } from './friends.js'
 import {
   readId,
@@ -74,6 +75,7 @@ const saveReaction = db.prepare(`
     SET kind = excluded.kind, created_at = excluded.created_at
     WHERE kind <> excluded.kind
 `)
+const findMyReaction = db.prepare('SELECT kind FROM post_reactions WHERE post_id = ? AND user_id = ?')
 const deleteReaction = db.prepare('DELETE FROM post_reactions WHERE post_id = ? AND user_id = ? AND kind = ?')
 
 function postsToJson(rows, viewer) {
@@ -165,6 +167,7 @@ router.post('/posts', requireAuth, (req, res) => {
   }
   const result = insertPost.run(req.user.id, body.value)
   notifyBoard(req.user.id)
+  notifyNewPost(req.user, body.value, false)
   res.status(201).json({ post: postsToJson([findPost.get(result.lastInsertRowid)], req.user)[0] })
 })
 
@@ -198,6 +201,7 @@ router.post(
       throw insertError
     }
     notifyBoard(req.user.id)
+    notifyNewPost(req.user, body.value, true)
     res.status(201).json({ post: postsToJson([findPost.get(result.lastInsertRowid)], req.user)[0] })
   }
 )
@@ -245,6 +249,7 @@ router.post('/posts/:id/comments', requireAuth, (req, res) => {
   }
   insertComment.run(post.id, req.user.id, body.value)
   notifyBoard(req.user.id)
+  notifyComment(post, req.user, body.value)
   res.status(201).json({ post: postsToJson([post], req.user)[0] })
 })
 
@@ -274,9 +279,13 @@ router.put('/posts/:id/reactions/:kind', requireAuth, (req, res) => {
   if (!target) {
     return
   }
+  const hadReaction = findMyReaction.get(target.post.id, req.user.id) !== undefined
   const result = saveReaction.run(target.post.id, req.user.id, target.kind)
   if (result.changes === 1) {
     notifyBoard(target.post.user_id)
+  }
+  if (result.changes === 1 && !hadReaction) {
+    notifyReaction(target.post, req.user, target.kind)
   }
   res.json({ post: postsToJson([target.post], req.user)[0] })
 })

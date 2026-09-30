@@ -59,3 +59,36 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(networkFirst(request, request))
   }
 })
+
+self.addEventListener('push', (event) => {
+  const message = event.data ? event.data.json() : {}
+  event.waitUntil(
+    self.registration.showNotification(message.title || 'Winter Arc', {
+      body: message.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url: message.url || '/' },
+    })
+  )
+})
+
+async function openFromNotification(path) {
+  const url = new URL(path, self.location.origin).href
+  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  const existing = windows.find((client) => client.url.startsWith(self.location.origin))
+  if (existing) {
+    try {
+      await existing.focus()
+      await existing.navigate(url)
+      return
+    } catch {
+      return self.clients.openWindow(url)
+    }
+  }
+  return self.clients.openWindow(url)
+}
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(openFromNotification(event.notification.data.url))
+})

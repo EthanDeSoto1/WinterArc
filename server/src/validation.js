@@ -178,6 +178,47 @@ export function readPhotoSide(value) {
   return { value: side }
 }
 
+const PUSH_HOSTS = ['push.apple.com', 'fcm.googleapis.com', 'push.services.mozilla.com', 'notify.windows.com']
+const PUSH_KEY_PATTERN = /^[A-Za-z0-9_-]+={0,2}$/
+
+export function readPushEndpoint(value) {
+  if (typeof value !== 'string' || value.length > 1000 || !URL.canParse(value)) {
+    return { error: 'Notification address is not valid' }
+  }
+  const url = new URL(value)
+  const knownHost = PUSH_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`))
+  if (url.protocol !== 'https:' || !knownHost) {
+    return { error: 'Notification address is not valid' }
+  }
+  return { value: url.href }
+}
+
+export function readPushSubscription(value) {
+  if (typeof value !== 'object' || value === null) {
+    return { error: 'Notification subscription is not valid' }
+  }
+  const endpoint = readPushEndpoint(value.endpoint)
+  if (endpoint.error) {
+    return endpoint
+  }
+  const keys = value.keys || {}
+  const p256dhIsValid =
+    typeof keys.p256dh === 'string' && PUSH_KEY_PATTERN.test(keys.p256dh) && Buffer.from(keys.p256dh, 'base64url').length === 65
+  const authIsValid =
+    typeof keys.auth === 'string' && PUSH_KEY_PATTERN.test(keys.auth) && Buffer.from(keys.auth, 'base64url').length === 16
+  if (!p256dhIsValid || !authIsValid) {
+    return { error: 'Notification subscription is not valid' }
+  }
+  return { value: { endpoint: endpoint.value, p256dh: keys.p256dh, auth: keys.auth } }
+}
+
+export function readSwitch(value) {
+  if (typeof value !== 'boolean') {
+    return { error: 'Each notification setting must be on or off' }
+  }
+  return { value: value ? 1 : 0 }
+}
+
 export function firstError(fields) {
   const failed = fields.find((field) => field.error)
   return failed ? failed.error : null

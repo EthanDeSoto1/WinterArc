@@ -2,6 +2,7 @@ import express from 'express'
 import db from './db.js'
 import { requireAuth } from './auth.js'
 import { notifyActivity } from './events.js'
+import { notifyCheckoff, notifyDayDone } from './push.js'
 import { readGoalTitle, readFrequency, readTimesPerWeek, readGoalIds, firstError } from './validation.js'
 import {
   todayInTimezone,
@@ -201,6 +202,11 @@ router.post('/goals/:id/complete', requireAuth, (req, res) => {
   const result = insertCompletion.run(goal.id, req.user.id, date)
   if (result.changes === 1) {
     notifyActivity(req.user.id)
+    const status = goalsWithStatus(req.user)
+    notifyCheckoff(req.user, goal, date, date === status.today)
+    if (date === status.today && status.goals.every(isFinishedToday)) {
+      notifyDayDone(req.user, status.goals.length, status.today)
+    }
   }
   res.status(result.changes === 1 ? 201 : 200).json({ goal: singleGoalWithStatus(goal, req.user) })
 })

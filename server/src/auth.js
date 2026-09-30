@@ -26,6 +26,7 @@ const insertUser = db.prepare(`
 const updateUser = db.prepare('UPDATE users SET display_name = ?, timezone = ?, avatar_color = ? WHERE id = ?')
 const updatePassword = db.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
 const deleteOtherSessions = db.prepare("DELETE FROM sessions WHERE json_extract(data, '$.userId') = ? AND sid != ?")
+const deletePushDevices = db.prepare('DELETE FROM push_subscriptions WHERE user_id = ?')
 
 const loginLimiterPerAccount = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -216,6 +217,7 @@ router.post('/me/password', requireAuth, passwordChangeLimiter, async (req, res)
   updatePassword.run(passwordHash, req.user.id)
   await startSession(req, req.user.id)
   const signedOut = deleteOtherSessions.run(req.user.id, req.sessionID).changes
+  deletePushDevices.run(req.user.id)
   res.json({ signedOut })
 })
 

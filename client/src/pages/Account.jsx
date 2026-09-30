@@ -6,8 +6,10 @@ import Page from '../components/Page.jsx'
 import ManageFriends from '../components/ManageFriends.jsx'
 import AvatarColorPicker from '../components/AvatarColorPicker.jsx'
 import ChangePassword from '../components/ChangePassword.jsx'
+import NotificationSettings from '../components/NotificationSettings.jsx'
 import { FormError, PrimaryButton, SelectField, TextField } from '../components/Form.jsx'
 import { deviceTimezone } from '../dates.js'
+import { turnOffPush } from '../push.js'
 
 function timezoneOptions(current) {
   const zones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : []
@@ -47,6 +49,7 @@ export default function Account() {
     setLogoutError('')
     setLoggingOut(true)
     try {
+      await turnOffPush().catch(() => {})
       await logout()
       navigate('/login', { replace: true })
     } catch (logoutFailure) {
@@ -114,6 +117,8 @@ export default function Account() {
       </form>
 
       <AvatarColorPicker />
+
+      <NotificationSettings />
 
       <ChangePassword />
 

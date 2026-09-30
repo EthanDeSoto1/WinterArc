@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../AuthContext.jsx'
+import { syncPush } from '../push.js'
 import { Avatar } from './PersonRow.jsx'
 import { AccountIcon, BoardIcon, CalendarIcon, FriendsIcon, TodayIcon } from './Icons.jsx'
 
@@ -187,6 +188,10 @@ export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [linkStatus, setLinkStatus] = useState('connecting')
+
+  useEffect(() => {
+    syncPush().catch(() => {})
+  }, [])
 
   useEffect(() => {
     let source = null

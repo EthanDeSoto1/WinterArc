@@ -10,6 +10,8 @@ import historyRoutes from './history.js'
 import feedRoutes from './feed.js'
 import postRoutes from './posts.js'
 import eventRoutes, { closeAllStreams } from './events.js'
+import pushRoutes from './push.js'
+import { startReminders } from './reminders.js'
 
 const sessionSecret = process.env.SESSION_SECRET || ''
 if (sessionSecret.length < 32) {
@@ -66,6 +68,7 @@ app.use('/api', historyRoutes)
 app.use('/api', feedRoutes)
 app.use('/api', postRoutes)
 app.use('/api', eventRoutes)
+app.use('/api', pushRoutes)
 
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found' })
@@ -98,6 +101,7 @@ app.use((err, req, res, next) => {
 const server = app.listen(port, () => {
   console.log(`Winter Arc listening on port ${port}`)
 })
+startReminders()
 
 function shutdown() {
   server.close(() => {

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api.js'
+import { syncPush } from '../push.js'
 import { useAuth } from '../AuthContext.jsx'
 import { SectionTitle } from './PersonRow.jsx'
 import { FormError, PrimaryButton, TextField } from './Form.jsx'
@@ -38,6 +39,7 @@ export default function ChangePassword() {
       setNewPassword('')
       setConfirmPassword('')
       setSuccess(signedOutMessage(result.signedOut))
+      syncPush().catch(() => {})
     } catch (saveError) {
       setError(saveError.message)
     }

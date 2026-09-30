@@ -39,6 +39,15 @@ Run these on your Linux server, inside the project folder (for example `~/winter
 
 3. Open `.env` with `nano .env` and set `INVITE_CODE` to a word only your friends will know. Leave it empty to let anyone on your tailnet sign up. Save with Ctrl+O, Enter, then exit with Ctrl+X.
 
+4. Notifications (optional). After the first `docker compose up -d --build` (section 2), create the notification keys once, then restart:
+
+   ```bash
+   docker compose run --rm --no-deps -T app node -e "const k = require('web-push').generateVAPIDKeys(); console.log('VAPID_PUBLIC_KEY=' + k.publicKey); console.log('VAPID_PRIVATE_KEY=' + k.privateKey)" >> .env
+   docker compose up -d
+   ```
+
+   Keep these keys. If they change, everyone has to turn notifications on again in Account. Without them the app still works, with notifications off.
+
 `.env` holds secrets. Never commit it or share it.
 
 ## 2. Start, stop, logs, updates
@@ -171,6 +180,8 @@ Winter Arc can be added to the home screen and opens full screen, like an app.
 
 The app updates by itself after you deploy a new version. If something looks stale, close it fully and open it again.
 
+**Notifications:** open the app from its home screen icon, go to **Account → Notifications**, tap **Turn on**, then **Allow**. On iPhone this needs iOS 16.4 or newer and only works from the home screen icon, not a Safari tab. Tap **Send a test** to check. Everyone picks what they get (Board posts, reactions and comments on their posts, friends' goals, and morning, midday and evening reminders). Notifications arrive through Apple's or Google's push service, so they show up even when Tailscale is off; opening one still needs Tailscale. The server needs normal outbound internet access to send them.
+
 ## Local development (optional)
 
 With Node 22 or newer, create a `.env` in the project folder for development:
@@ -180,6 +191,8 @@ SESSION_SECRET=any-string-at-least-32-characters-long
 INVITE_CODE=
 COOKIE_SECURE=false
 ```
+
+To try notifications locally, add `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` from `cd server && node -e "console.log(require('web-push').generateVAPIDKeys())"`. The service worker is only registered in production builds (`npm run build`, then open the app from the server's port).
 
 `COOKIE_SECURE=false` is only for plain `http://localhost` during development. Never set it on the server, where login cookies must stay HTTPS-only.
 
