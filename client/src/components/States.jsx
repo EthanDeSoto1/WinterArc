@@ -1,6 +1,6 @@
 export function LoadingState({ message = 'Loading…' }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 text-steel-500" role="status">
+    <div className="flex flex-col items-center justify-center gap-4 py-16 text-steel-500 lg:animate-[fade-up_260ms_200ms_ease-out_both]" role="status">
       <div className="size-7 animate-spin rounded-full border-2 border-white/10 border-t-ice-300" />
       <p className="text-sm">{message}</p>
     </div>

@@ -115,13 +115,13 @@ export default function FriendCard({ friend }) {
   const panelId = `friend-${friend.id}-goals`
 
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-ink-900/70 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)]">
+    <div className="rounded-2xl border border-white/[0.06] bg-ink-900/70 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)] transition lg:hover:border-ice-300/25 lg:hover:shadow-[0_12px_40px_-20px_rgb(132_197_255/0.6)]">
       <button
         type="button"
         onClick={toggle}
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex min-h-[4.25rem] w-full items-center gap-3 rounded-2xl py-2 pr-3 pl-3 text-left transition active:bg-white/[0.03]"
+        className="flex min-h-[4.25rem] w-full items-center gap-3 rounded-2xl py-2 pr-3 pl-3 text-left transition active:bg-white/[0.03] lg:hover:bg-white/[0.02]"
       >
         <Avatar user={friend} />
         <span className="min-w-0 flex-1">

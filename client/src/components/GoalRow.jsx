@@ -66,8 +66,8 @@ export default function GoalRow({ goal, done, finished = false, onToggle }) {
       className={`flex min-h-[4.25rem] w-full items-center gap-4 rounded-2xl border px-4 py-3.5 text-left transition duration-300 active:scale-[0.985] ${
         done
           ? 'border-ice-300/15 bg-ice-300/[0.035]'
-          : 'border-white/[0.06] bg-ink-900/70 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)]'
-      } ${finished ? 'opacity-75' : ''}`}
+          : 'border-white/[0.06] bg-ink-900/70 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)] lg:hover:bg-ink-800/70'
+      } ${finished ? 'opacity-75' : ''} lg:hover:border-ice-300/30 lg:hover:shadow-[0_12px_40px_-20px_rgb(132_197_255/0.6)]`}
     >
       <span className="relative flex size-8 shrink-0 items-center justify-center">
         {animate && <span key={`burst-${checkCount}`} className="absolute inset-0 animate-ring-burst rounded-full border border-ice-200" />}

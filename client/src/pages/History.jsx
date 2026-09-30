@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { Link } from 'react-router'
+import { useAuth } from '../AuthContext.jsx'
 import Page from '../components/Page.jsx'
 import { Avatar, SectionTitle } from '../components/PersonRow.jsx'
 import { Segmented } from '../components/Form.jsx'
@@ -203,7 +204,7 @@ function Summary({ weeks }) {
     { status: 'low', value: count('low') },
   ]
   return (
-    <div className="mb-7 rounded-2xl border border-white/[0.06] bg-ink-900/70 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]">
+    <div className="hud mb-7 rounded-2xl border border-white/[0.06] bg-ink-900/70 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)] lg:p-6">
       <div className="grid grid-cols-3 gap-2">
         {items.map((item) => (
           <div key={item.status} className="flex flex-col items-center gap-1.5">
@@ -225,6 +226,7 @@ function Summary({ weeks }) {
 }
 
 function MyHistory() {
+  const { user } = useAuth()
   const [data, setData] = useState(null)
   const [status, setStatus] = useState('loading')
   const [loadError, setLoadError] = useState('')
@@ -246,7 +248,17 @@ function MyHistory() {
 
   useEffect(() => {
     loadHistory()
-  }, [])
+    function handleActivity(event) {
+      const userId = event.detail ? event.detail.userId : null
+      if (userId === null || userId === user.id) {
+        api('/history')
+          .then(setData)
+          .catch(() => {})
+      }
+    }
+    window.addEventListener('winterarc:activity', handleActivity)
+    return () => window.removeEventListener('winterarc:activity', handleActivity)
+  }, [user.id])
 
   if (status === 'loading') {
     return <LoadingState message="Loading your history…" />
@@ -266,57 +278,61 @@ function MyHistory() {
   }
 
   return (
-    <>
-      <Summary weeks={data.weeks} />
-
-      <SectionTitle>Calendar</SectionTitle>
-      <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_3rem] text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-steel-500">
-        {WEEKDAYS.map((weekday, index) => (
-          <span key={index} className="py-2">
-            {weekday}
-          </span>
-        ))}
-        <span className="border-l border-white/[0.06] py-2">Wk</span>
+    <div className="lg:grid lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:items-start lg:gap-12">
+      <div className="lg:sticky lg:top-12 lg:animate-rise-in">
+        <Summary weeks={data.weeks} />
       </div>
 
-      {data.weeks.map((week, index) => {
-        const label = monthLabel(week, index)
-        const selectedDay = week.days.find((day) => isSelected('day', day.date))
-        const weekSelected = isSelected('week', week.start)
-        return (
-          <div key={week.start}>
-            {label && (
-              <p className="mt-3 mb-1 px-1 text-[13px] font-semibold tracking-tight text-ice-100">{label}</p>
-            )}
-            <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_3rem]">
-              {week.days.map((day) => (
-                <DayCell
-                  key={day.date}
-                  day={day}
-                  isToday={day.date === data.today}
-                  selected={selectedDay === day}
-                  onSelect={() => toggle('day', day.date)}
-                />
-              ))}
-              <div className="border-l border-white/[0.06]">
-                <WeekMarker week={week} selected={weekSelected} onSelect={() => toggle('week', week.start)} />
-              </div>
-            </div>
-            {(selectedDay || weekSelected) && (
-              <div
-                className="my-2 animate-fade-up rounded-2xl border border-white/[0.06] bg-ink-900/70 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]"
-                aria-live="polite"
-              >
-                {selectedDay && <DayDetail day={selectedDay} goalsById={goalsById} isToday={selectedDay.date === data.today} />}
-                {weekSelected && <WeekDetail week={week} goalsById={goalsById} />}
-              </div>
-            )}
-          </div>
-        )
-      })}
+      <div className="lg:max-w-2xl lg:animate-rise-in lg:[animation-delay:80ms]">
+        <SectionTitle>Calendar</SectionTitle>
+        <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_3rem] text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-steel-500">
+          {WEEKDAYS.map((weekday, index) => (
+            <span key={index} className="py-2">
+              {weekday}
+            </span>
+          ))}
+          <span className="border-l border-white/[0.06] py-2">Wk</span>
+        </div>
 
-      <p className="mt-6 px-1 text-center text-xs text-steel-500">Tap a day or a week to see what you did.</p>
-    </>
+        {data.weeks.map((week, index) => {
+          const label = monthLabel(week, index)
+          const selectedDay = week.days.find((day) => isSelected('day', day.date))
+          const weekSelected = isSelected('week', week.start)
+          return (
+            <div key={week.start}>
+              {label && (
+                <p className="mt-3 mb-1 px-1 text-[13px] font-semibold tracking-tight text-ice-100">{label}</p>
+              )}
+              <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_3rem]">
+                {week.days.map((day) => (
+                  <DayCell
+                    key={day.date}
+                    day={day}
+                    isToday={day.date === data.today}
+                    selected={selectedDay === day}
+                    onSelect={() => toggle('day', day.date)}
+                  />
+                ))}
+                <div className="border-l border-white/[0.06]">
+                  <WeekMarker week={week} selected={weekSelected} onSelect={() => toggle('week', week.start)} />
+                </div>
+              </div>
+              {(selectedDay || weekSelected) && (
+                <div
+                  className="my-2 animate-fade-up rounded-2xl border border-white/[0.06] bg-ink-900/70 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]"
+                  aria-live="polite"
+                >
+                  {selectedDay && <DayDetail day={selectedDay} goalsById={goalsById} isToday={selectedDay.date === data.today} />}
+                  {weekSelected && <WeekDetail week={week} goalsById={goalsById} />}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        <p className="mt-6 px-1 text-center text-xs text-steel-500">Tap a day or a week to see what you did.</p>
+      </div>
+    </div>
   )
 }
 
@@ -329,7 +345,7 @@ function BoardRow({ person, rank }) {
     <li
       className={`flex min-h-[4.25rem] items-center gap-3 rounded-2xl border bg-ink-900/70 py-2 pr-4 pl-3 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)] ${
         person.isYou ? 'border-ice-300/25' : 'border-white/[0.06]'
-      }`}
+      } transition lg:hover:border-ice-300/30 lg:hover:shadow-[0_12px_40px_-20px_rgb(132_197_255/0.6)]`}
     >
       <span className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-steel-400">{rank || '–'}</span>
       <Avatar user={person.user} />
@@ -379,6 +395,13 @@ function FriendsMonthly() {
 
   useEffect(() => {
     loadBoard()
+    function handleActivity() {
+      api('/history/friends')
+        .then((result) => setMonths(result.months))
+        .catch(() => {})
+    }
+    window.addEventListener('winterarc:activity', handleActivity)
+    return () => window.removeEventListener('winterarc:activity', handleActivity)
   }, [])
 
   if (status === 'loading') {
@@ -407,7 +430,7 @@ function FriendsMonthly() {
   }
 
   return (
-    <>
+    <div className="lg:max-w-2xl">
       {months.length > 1 && (
         <div className="mb-6">
           <Segmented
@@ -419,7 +442,7 @@ function FriendsMonthly() {
         </div>
       )}
       <SectionTitle>{monthName(shown.month)} results</SectionTitle>
-      <ol className="flex flex-col gap-2">
+      <ol className="stagger flex flex-col gap-2">
         {people.map((person) => (
           <BoardRow key={person.user.id} person={person} rank={rankOf(person)} />
         ))}
@@ -435,7 +458,7 @@ function FriendsMonthly() {
       <p className="mt-6 px-1 text-center text-xs text-steel-500">
         Ranked by the share of daily goals checked off. Weekly goals aren't counted.
       </p>
-    </>
+    </div>
   )
 }
 
@@ -443,8 +466,8 @@ export default function History() {
   const [view, setView] = useState('mine')
 
   return (
-    <Page eyebrow="Winter Arc" title="History">
-      <div className="mb-6">
+    <Page eyebrow="Winter Arc" title="History" wide>
+      <div className="mb-6 lg:max-w-sm">
         <Segmented
           label="Whose history"
           value={view}

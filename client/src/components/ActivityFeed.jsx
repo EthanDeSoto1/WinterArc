@@ -88,7 +88,7 @@ export default function ActivityFeed() {
   }, [user.timezone])
 
   return (
-    <section className="mt-8">
+    <section className="mt-8 lg:mt-0">
       <SectionTitle>Activity</SectionTitle>
       {status === 'loading' && (
         <div className="flex items-center gap-3 px-1 py-4 text-sm text-steel-500" role="status">
@@ -107,7 +107,7 @@ export default function ActivityFeed() {
           {groupByDay(feed.items).map((group) => (
             <div key={group.day}>
               <p className="mb-2 px-1 text-xs font-medium text-steel-400">{dayHeading(group.day, feed)}</p>
-              <ul className="flex flex-col gap-2">
+              <ul className="stagger flex flex-col gap-2">
                 {group.items.map((item) => (
                   <FeedItem key={item.id} item={item} isYou={item.user.id === user.id} timezone={user.timezone} />
                 ))}

@@ -133,6 +133,7 @@ router.post('/goals', requireAuth, (req, res) => {
   }
 
   const result = insertGoal.run(req.user.id, title.value, frequency.value, timesPerWeek.value, req.user.id)
+  notifyActivity(req.user.id)
   res.status(201).json({ goal: singleGoalWithStatus(findGoal.get(result.lastInsertRowid), req.user) })
 })
 
@@ -147,6 +148,7 @@ router.put('/goals/order', requireAuth, (req, res) => {
     return res.status(409).json({ error: 'Your goals changed. Refresh and try again.' })
   }
   saveOrder(goalIds.value)
+  notifyActivity(req.user.id)
   res.json(goalsWithStatus(req.user))
 })
 
@@ -173,6 +175,7 @@ router.patch('/goals/:id', requireAuth, (req, res) => {
   }
 
   updateGoal.run(title.value, frequency.value, timesPerWeek.value, goal.id)
+  notifyActivity(req.user.id)
   res.json({ goal: singleGoalWithStatus(findGoal.get(goal.id), req.user) })
 })
 
@@ -182,6 +185,7 @@ router.post('/goals/:id/archive', requireAuth, (req, res) => {
     return
   }
   archiveGoal.run(goal.id)
+  notifyActivity(req.user.id)
   res.status(204).end()
 })
 

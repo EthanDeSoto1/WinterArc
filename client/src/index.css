@@ -26,6 +26,11 @@
   --animate-ring-burst: ring-burst 600ms ease-out forwards;
   --animate-draw-check: draw-check 300ms 80ms ease-out both;
   --animate-fade-up: fade-up 260ms ease-out both;
+  --animate-page-in: page-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-rail-in: rail-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-rise-in: rise-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-spin-slow: spin 60s linear infinite;
+  --animate-spin-reverse: spin-reverse 90s linear infinite;
 
   @keyframes check-pop {
     0% {
@@ -59,6 +64,47 @@
     }
     to {
       stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+      filter: blur(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes rail-in {
+    from {
+      opacity: 0;
+      transform: translateX(-12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes spin-reverse {
+    to {
+      transform: rotate(-360deg);
     }
   }
 
@@ -97,6 +143,85 @@ body::before {
     radial-gradient(60% 40% at 100% 0%, rgb(174 219 255 / 0.05), transparent 70%);
 }
 
+@media (min-width: 64rem) {
+  .desktop-shell::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgb(174 219 255 / 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(174 219 255 / 0.07) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(420px circle at var(--mx, 60%) var(--my, 30%), #000, transparent 75%);
+  }
+
+  .desktop-shell::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(700px circle at var(--mx, 60%) var(--my, 30%), rgb(132 197 255 / 0.05), transparent 60%);
+  }
+
+  .hud {
+    position: relative;
+    --hud-color: rgb(174 219 255 / 0.3);
+    --hud-size: 12px;
+  }
+
+  .hud::before {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    pointer-events: none;
+    background:
+      linear-gradient(var(--hud-color), var(--hud-color)) top left / var(--hud-size) 1px no-repeat,
+      linear-gradient(var(--hud-color), var(--hud-color)) top left / 1px var(--hud-size) no-repeat,
+      linear-gradient(var(--hud-color), var(--hud-color)) top right / var(--hud-size) 1px no-repeat,
+      linear-gradient(var(--hud-color), var(--hud-color)) top right / 1px var(--hud-size) no-repeat,
+      linear-gradient(var(--hud-color), var(--hud-color)) bottom left / var(--hud-size) 1px no-repeat,
+      linear-gradient(var(--hud-color), var(--hud-color)) bottom left / 1px var(--hud-size) no-repeat,
+      linear-gradient(var(--hud-color), var(--hud-color)) bottom right / var(--hud-size) 1px no-repeat,
+      linear-gradient(var(--hud-color), var(--hud-color)) bottom right / 1px var(--hud-size) no-repeat;
+    transition:
+      inset 400ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 400ms ease;
+    opacity: 0.8;
+  }
+
+  .hud:hover::before {
+    inset: -8px;
+    opacity: 1;
+  }
+
+  .stagger > * {
+    animation: rise-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .stagger > :nth-child(2) {
+    animation-delay: 50ms;
+  }
+
+  .stagger > :nth-child(3) {
+    animation-delay: 100ms;
+  }
+
+  .stagger > :nth-child(4) {
+    animation-delay: 150ms;
+  }
+
+  .stagger > :nth-child(5) {
+    animation-delay: 200ms;
+  }
+
+  .stagger > :nth-child(n + 6) {
+    animation-delay: 250ms;
+  }
+}
+
 input,
 select,
 textarea {
@@ -122,6 +247,7 @@ textarea {
   *::before,
   *::after {
     animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
 
