@@ -10,6 +10,7 @@ import AddFriend from './pages/AddFriend.jsx'
 import Settings from './pages/Settings.jsx'
 import Goals from './pages/Goals.jsx'
 import History from './pages/History.jsx'
+import Board from './pages/Board.jsx'
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
               <Route path="/goals" element={<Goals />} />
               <Route path="/history" element={<History />} />
               <Route path="/friends" element={<Friends />} />
+              <Route path="/board" element={<Board />} />
               <Route path="/add-friend" element={<AddFriend />} />
               <Route path="/settings" element={<Settings />} />
             </Route>

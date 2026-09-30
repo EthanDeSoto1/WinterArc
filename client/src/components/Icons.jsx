@@ -57,6 +57,16 @@ export function AddFriendIcon(props) {
   )
 }
 
+export function BoardIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-6.5L8 20.5V17H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+      <path d="M7.5 8.5h9" />
+      <path d="M7.5 12.5h5.5" />
+    </Icon>
+  )
+}
+
 export function SettingsIcon(props) {
   return (
     <Icon {...props}>

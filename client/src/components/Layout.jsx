@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../AuthContext.jsx'
 import { Avatar } from './PersonRow.jsx'
-import { AddFriendIcon, CalendarIcon, FriendsIcon, SettingsIcon, TodayIcon } from './Icons.jsx'
+import { AddFriendIcon, BoardIcon, CalendarIcon, FriendsIcon, SettingsIcon, TodayIcon } from './Icons.jsx'
 
 const tabs = [
   { to: '/', label: 'Today', icon: TodayIcon, end: true },
   { to: '/history', label: 'History', icon: CalendarIcon },
   { to: '/friends', label: 'Friends', icon: FriendsIcon },
+  { to: '/board', label: 'Board', icon: BoardIcon },
   { to: '/add-friend', label: 'Add friend', icon: AddFriendIcon },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
@@ -18,6 +19,10 @@ const RAIL_ITEM_HEIGHT = 48
 
 function announceActivity(userId) {
   window.dispatchEvent(new CustomEvent('winterarc:activity', { detail: { userId } }))
+}
+
+function announceBoard() {
+  window.dispatchEvent(new Event('winterarc:board'))
 }
 
 function useIsDesktop() {
@@ -152,7 +157,7 @@ function MobileTabs() {
               to={tab.to}
               end={tab.end}
               className={({ isActive }) =>
-                `relative flex min-h-[4.5rem] flex-col items-center justify-center gap-1 text-[11px] font-medium tracking-wide transition-colors ${
+                `relative flex min-h-[4.5rem] flex-col items-center justify-center gap-1 text-[10px] font-medium whitespace-nowrap transition-colors min-[360px]:text-[11px] min-[360px]:tracking-wide ${
                   isActive ? 'text-ice-100' : 'text-steel-500 active:text-steel-300'
                 }`
               }
@@ -196,11 +201,13 @@ export default function Layout() {
         if (lostConnection) {
           lostConnection = false
           announceActivity(null)
+          announceBoard()
         }
       })
       source.addEventListener('activity', (event) => {
         announceActivity(JSON.parse(event.data).userId)
       })
+      source.addEventListener('board', announceBoard)
       source.addEventListener('error', () => {
         lostConnection = true
         setLinkStatus('reconnecting')

@@ -132,6 +132,26 @@ export function readGoalIds(value) {
   return { value }
 }
 
+export const REACTION_KINDS = ['fire', 'muscle', 'clap']
+
+export function readReactionKind(value) {
+  if (!REACTION_KINDS.includes(value)) {
+    return { error: 'Unknown reaction' }
+  }
+  return { value }
+}
+
+export function readPostBody(value) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return { error: 'Write something first' }
+  }
+  const body = value.replace(/\r\n?/g, '\n').trim().replace(/\n{3,}/g, '\n\n')
+  if (body.length > 500) {
+    return { error: 'Posts must be 500 characters or fewer' }
+  }
+  return { value: body }
+}
+
 export function firstError(fields) {
   const failed = fields.find((field) => field.error)
   return failed ? failed.error : null

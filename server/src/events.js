@@ -24,11 +24,19 @@ function sendTo(userId, eventName, data) {
   }
 }
 
-export function notifyActivity(userId) {
+function sendToUserAndFriends(userId, eventName) {
   const friendIds = findFriendIds.all(userId, userId).map((row) => row.id)
   for (const id of [userId, ...friendIds]) {
-    sendTo(id, 'activity', { userId })
+    sendTo(id, eventName, { userId })
   }
+}
+
+export function notifyActivity(userId) {
+  sendToUserAndFriends(userId, 'activity')
+}
+
+export function notifyBoard(userId) {
+  sendToUserAndFriends(userId, 'board')
 }
 
 export function closeAllStreams() {

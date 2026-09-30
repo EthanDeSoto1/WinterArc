@@ -26,6 +26,23 @@ const migrations = [
   `
   ALTER TABLE users ADD COLUMN avatar_color TEXT NOT NULL DEFAULT 'frost';
   `,
+  `
+  CREATE TABLE posts (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+  CREATE INDEX posts_user ON posts (user_id);
+  CREATE TABLE post_reactions (
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('fire', 'muscle', 'clap')),
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (post_id, user_id, kind)
+  );
+  CREATE INDEX post_reactions_user ON post_reactions (user_id);
+  `,
 ]
 
 const currentVersion = db.pragma('user_version', { simple: true })
