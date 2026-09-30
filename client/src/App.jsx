@@ -6,7 +6,6 @@ import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
 import Today from './pages/Today.jsx'
 import Friends from './pages/Friends.jsx'
-import AddFriend from './pages/AddFriend.jsx'
 import Settings from './pages/Settings.jsx'
 import Goals from './pages/Goals.jsx'
 import History from './pages/History.jsx'
@@ -28,7 +27,7 @@ export default function App() {
               <Route path="/history" element={<History />} />
               <Route path="/friends" element={<Friends />} />
               <Route path="/board" element={<Board />} />
-              <Route path="/add-friend" element={<AddFriend />} />
+              <Route path="/add-friend" element={<Navigate to="/friends?add=1" replace />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
           </Route>

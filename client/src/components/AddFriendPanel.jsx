@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import Page from '../components/Page.jsx'
-import PersonRow, { SectionTitle } from '../components/PersonRow.jsx'
-import { SmallButton, TextField } from '../components/Form.jsx'
-import { ErrorState, LoadingState, Toast } from '../components/States.jsx'
+import PersonRow, { SectionTitle } from './PersonRow.jsx'
+import { SmallButton, TextField } from './Form.jsx'
+import { ErrorState, LoadingState, Toast } from './States.jsx'
 
 const SEARCH_PATTERN = /^@?[a-zA-Z0-9_]*$/
 
@@ -28,7 +27,7 @@ function SearchResultAction({ user, busy, onAdd, onAccept }) {
   )
 }
 
-export default function AddFriend() {
+export default function AddFriendPanel({ onFriendsChange }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searchStatus, setSearchStatus] = useState('idle')
@@ -109,6 +108,7 @@ export default function AddFriend() {
     }
     setBusyKey(null)
     loadRequests()
+    onFriendsChange()
   }
 
   function sendRequest(user) {
@@ -140,7 +140,7 @@ export default function AddFriend() {
   }
 
   return (
-    <Page eyebrow="Find people" title="Add friend">
+    <section className="mb-8 border-b border-white/[0.06] pb-8 lg:max-w-2xl" aria-label="Add friend">
       <form onSubmit={(event) => event.preventDefault()} role="search">
         <TextField
           label="Search by username"
@@ -243,6 +243,6 @@ export default function AddFriend() {
         </section>
       )}
       <Toast message={toast} />
-    </Page>
+    </section>
   )
 }

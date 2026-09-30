@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { api } from '../api.js'
 import Page from '../components/Page.jsx'
+import AddFriendPanel from '../components/AddFriendPanel.jsx'
+import { AddFriendIcon } from '../components/Icons.jsx'
 import FriendCard from '../components/FriendCard.jsx'
 import ActivityFeed from '../components/ActivityFeed.jsx'
 import { SectionTitle } from '../components/PersonRow.jsx'
@@ -12,6 +14,8 @@ export default function Friends() {
   const [incomingCount, setIncomingCount] = useState(0)
   const [status, setStatus] = useState('loading')
   const [loadError, setLoadError] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const adding = searchParams.get('add') === '1'
 
   function loadFriends(showSpinner) {
     if (showSpinner) {
@@ -42,8 +46,35 @@ export default function Friends() {
 
   const eyebrow = status === 'ready' ? `${friends.length} ${friends.length === 1 ? 'friend' : 'friends'}` : 'Your crew'
 
+  function toggleAdding() {
+    setSearchParams(adding ? {} : { add: '1' }, { replace: true })
+  }
+
+  const addButton = (
+    <button
+      type="button"
+      onClick={toggleAdding}
+      aria-expanded={adding}
+      className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition active:scale-[0.97] ${
+        adding
+          ? 'border border-white/10 text-steel-200 active:bg-white/5'
+          : 'bg-ice-50 text-black shadow-[0_0_20px_-8px_rgb(174_219_255/0.6)] active:bg-ice-200'
+      }`}
+    >
+      {adding ? (
+        'Done'
+      ) : (
+        <>
+          <AddFriendIcon className="size-5" />
+          Add friend
+        </>
+      )}
+    </button>
+  )
+
   return (
-    <Page eyebrow={eyebrow} title="Friends" wide>
+    <Page eyebrow={eyebrow} title="Friends" action={addButton} wide>
+      {adding && <AddFriendPanel onFriendsChange={() => loadFriends(false)} />}
       {status === 'loading' && <LoadingState message="Loading friends…" />}
       {status === 'error' && <ErrorState message={loadError} onRetry={() => loadFriends(true)} />}
       {status === 'ready' && (
@@ -53,9 +84,10 @@ export default function Friends() {
               <SectionTitle>Crew</SectionTitle>
             </div>
             <div className="stagger flex flex-col gap-2.5">
-              {incomingCount > 0 && (
+              {incomingCount > 0 && !adding && (
                 <Link
-                  to="/add-friend"
+                  to="/friends?add=1"
+                  replace
                   className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-ice-300/25 bg-ice-300/[0.06] px-4 text-[15px] font-medium text-ice-100 transition active:bg-ice-300/10"
                 >
                   <span>
@@ -68,7 +100,8 @@ export default function Friends() {
               {friends.length === 0 && (
                 <EmptyState title="No friends yet" message="Add friends by username to follow each other’s Winter Arc.">
                   <Link
-                    to="/add-friend"
+                    to="/friends?add=1"
+                    replace
                     className="flex min-h-11 items-center rounded-xl bg-ice-50 px-5 text-sm font-semibold text-black shadow-[0_0_24px_-8px_rgb(174_219_255/0.6)]"
                   >
                     Add a friend

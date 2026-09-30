@@ -449,7 +449,7 @@ function FriendsMonthly() {
       </ol>
       {people.length === 1 && (
         <p className="mt-4 px-1 text-center text-sm text-steel-400">
-          <Link to="/add-friend" className="inline-flex min-h-11 items-center font-semibold text-ice-200 underline-offset-4 active:underline">
+          <Link to="/friends?add=1" className="inline-flex min-h-11 items-center font-semibold text-ice-200 underline-offset-4 active:underline">
             Add friends
           </Link>{' '}
           to see how they did.
