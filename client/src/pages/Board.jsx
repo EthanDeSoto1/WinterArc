@@ -4,9 +4,10 @@ import { useAuth } from '../AuthContext.jsx'
 import Page from '../components/Page.jsx'
 import { Avatar } from '../components/PersonRow.jsx'
 import PostComposer from '../components/PostComposer.jsx'
+import PostComments from '../components/PostComments.jsx'
 import { SmallButton } from '../components/Form.jsx'
 import { EmptyState, ErrorState, LoadingState, Toast } from '../components/States.jsx'
-import { formatShortDate, formatTime } from '../dates.js'
+import { formatPostedWhen } from '../dates.js'
 
 const MAX_FACES = 3
 
@@ -15,17 +16,6 @@ const REACTIONS = [
   { kind: 'muscle', emoji: '💪', label: 'Strong' },
   { kind: 'clap', emoji: '👏', label: 'Applause' },
 ]
-
-function postedWhen(post, board, timezone) {
-  const time = formatTime(post.createdAt, timezone)
-  if (post.day === board.today) {
-    return `Today · ${time}`
-  }
-  if (post.day === board.yesterday) {
-    return `Yesterday · ${time}`
-  }
-  return `${formatShortDate(post.day)} · ${time}`
-}
 
 function withoutMe(reaction, me) {
   return { ...reaction, mine: false, count: reaction.count - 1, people: reaction.people.filter((person) => person.id !== me.id) }
@@ -54,7 +44,7 @@ function reactionLabel(info, reaction, me) {
   return names.length === 0 ? `${info.label}, 0` : `${info.label}, ${names.length}: ${names.join(', ')}`
 }
 
-function PostCard({ post, board, me, timezone, onReact, onDelete, deleting }) {
+function PostCard({ post, board, me, timezone, onReact, onDelete, onChange, onError, deleting }) {
   return (
     <li className="rounded-2xl border border-white/[0.06] bg-ink-900/70 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)] transition lg:hover:border-ice-300/30 lg:hover:shadow-[0_0_28px_-12px_rgb(174_219_255/0.5)]">
       <div className="flex items-center gap-3">
@@ -62,7 +52,7 @@ function PostCard({ post, board, me, timezone, onReact, onDelete, deleting }) {
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-medium text-ice-50">{post.isYours ? 'You' : post.user.displayName}</p>
           <p className="truncate text-xs text-steel-500">
-            <time dateTime={post.createdAt}>{postedWhen(post, board, timezone)}</time>
+            <time dateTime={post.createdAt}>{formatPostedWhen(post.createdAt, post.day, board, timezone)}</time>
           </p>
         </div>
         {post.isYours && (
@@ -123,6 +113,7 @@ function PostCard({ post, board, me, timezone, onReact, onDelete, deleting }) {
           )
         })}
       </div>
+      <PostComments post={post} board={board} timezone={timezone} onChange={onChange} onError={onError} />
     </li>
   )
 }
@@ -283,6 +274,8 @@ export default function Board() {
                   timezone={user.timezone}
                   onReact={handleReact}
                   onDelete={handleDelete}
+                  onChange={replacePost}
+                  onError={setToast}
                   deleting={deletingId === post.id}
                 />
               ))}

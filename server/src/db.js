@@ -66,6 +66,17 @@ const migrations = [
   ALTER TABLE post_reactions_one RENAME TO post_reactions;
   CREATE INDEX post_reactions_user ON post_reactions (user_id);
   `,
+  `
+  CREATE TABLE post_comments (
+    id INTEGER PRIMARY KEY,
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+  CREATE INDEX post_comments_post ON post_comments (post_id, id);
+  CREATE INDEX post_comments_user ON post_comments (user_id);
+  `,
 ]
 
 const currentVersion = db.pragma('user_version', { simple: true })

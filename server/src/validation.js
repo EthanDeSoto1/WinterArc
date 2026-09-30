@@ -152,6 +152,17 @@ export function readPostBody(value) {
   return { value: body }
 }
 
+export function readCommentBody(value) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return { error: 'Write a comment first' }
+  }
+  const body = value.trim().replace(/\s+/g, ' ')
+  if (body.split(' ').length > 100 || body.length > 600) {
+    return { error: 'Comments must be 100 words or fewer' }
+  }
+  return { value: body }
+}
+
 export function readCaption(value) {
   if (value === undefined || (typeof value === 'string' && value.trim() === '')) {
     return { value: '' }

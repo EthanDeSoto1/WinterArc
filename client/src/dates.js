@@ -42,3 +42,14 @@ export function deviceTimezone() {
 export function formatTime(timestamp, timezone) {
   return new Date(timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: timezone })
 }
+
+export function formatPostedWhen(timestamp, day, board, timezone) {
+  const time = formatTime(timestamp, timezone)
+  if (day === board.today) {
+    return `Today · ${time}`
+  }
+  if (day === board.yesterday) {
+    return `Yesterday · ${time}`
+  }
+  return `${formatShortDate(day)} · ${time}`
+}

@@ -9,6 +9,7 @@ import { publicUser } from './friends.js'
 import {
   readId,
   readPostBody,
+  readCommentBody,
   readCaption,
   readPhotoSide,
   readReactionKind,
@@ -47,6 +48,17 @@ const findReactions = db.prepare(`
   WHERE post_reactions.post_id IN (SELECT value FROM json_each(?))
   ORDER BY post_reactions.created_at, post_reactions.user_id
 `)
+const findComments = db.prepare(`
+  SELECT post_comments.id, post_comments.post_id, post_comments.body, post_comments.created_at,
+    users.id AS user_id, users.username, users.display_name, users.avatar_color
+  FROM post_comments
+  JOIN users ON users.id = post_comments.user_id
+  WHERE post_comments.post_id IN (SELECT value FROM json_each(?))
+  ORDER BY post_comments.id
+`)
+const findComment = db.prepare('SELECT * FROM post_comments WHERE id = ? AND post_id = ?')
+const insertComment = db.prepare('INSERT INTO post_comments (post_id, user_id, body) VALUES (?, ?, ?)')
+const deleteComment = db.prepare('DELETE FROM post_comments WHERE id = ?')
 const countRecentPhotos = db.prepare(`
   SELECT count(*) AS count FROM posts
   WHERE user_id = ? AND photo IS NOT NULL AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')
@@ -65,7 +77,9 @@ const saveReaction = db.prepare(`
 const deleteReaction = db.prepare('DELETE FROM post_reactions WHERE post_id = ? AND user_id = ? AND kind = ?')
 
 function postsToJson(rows, viewer) {
-  const reactionRows = findReactions.all(JSON.stringify(rows.map((row) => row.id)))
+  const postIds = JSON.stringify(rows.map((row) => row.id))
+  const reactionRows = findReactions.all(postIds)
+  const commentRows = findComments.all(postIds)
   return rows.map((row) => ({
     id: row.id,
     body: row.body,
@@ -83,6 +97,16 @@ function postsToJson(rows, viewer) {
         people: people.map(publicUser),
       }
     }),
+    comments: commentRows
+      .filter((comment) => comment.post_id === row.id)
+      .map((comment) => ({
+        id: comment.id,
+        body: comment.body,
+        createdAt: comment.created_at,
+        day: todayInTimezone(viewer.timezone, new Date(comment.created_at)),
+        isYours: comment.user_id === viewer.id,
+        user: { id: comment.user_id, username: comment.username, displayName: comment.display_name, avatarColor: comment.avatar_color },
+      })),
   }))
 }
 
@@ -208,6 +232,41 @@ router.delete('/posts/:id', requireAuth, (req, res) => {
   }
   notifyBoard(req.user.id)
   res.status(204).end()
+})
+
+router.post('/posts/:id/comments', requireAuth, (req, res) => {
+  const post = loadVisiblePost(req, res)
+  if (!post) {
+    return
+  }
+  const body = readCommentBody(req.body.body)
+  if (body.error) {
+    return res.status(400).json({ error: body.error })
+  }
+  insertComment.run(post.id, req.user.id, body.value)
+  notifyBoard(req.user.id)
+  res.status(201).json({ post: postsToJson([post], req.user)[0] })
+})
+
+router.delete('/posts/:id/comments/:commentId', requireAuth, (req, res) => {
+  const post = loadVisiblePost(req, res)
+  if (!post) {
+    return
+  }
+  const commentId = readId(req.params.commentId, 'comment')
+  if (commentId.error) {
+    return res.status(400).json({ error: commentId.error })
+  }
+  const comment = findComment.get(commentId.value, post.id)
+  if (!comment) {
+    return res.status(404).json({ error: 'That comment no longer exists' })
+  }
+  if (comment.user_id !== req.user.id) {
+    return res.status(403).json({ error: 'You can only delete your own comments' })
+  }
+  deleteComment.run(comment.id)
+  notifyBoard(req.user.id)
+  res.json({ post: postsToJson([post], req.user)[0] })
 })
 
 router.put('/posts/:id/reactions/:kind', requireAuth, (req, res) => {
