@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../api.js'
 import Page from '../components/Page.jsx'
-import PersonRow from '../components/PersonRow.jsx'
-import { SmallButton } from '../components/Form.jsx'
+import FriendCard from '../components/FriendCard.jsx'
 import { EmptyState, ErrorState, LoadingState, Toast } from '../components/States.jsx'
 
 export default function Friends() {
@@ -87,16 +86,7 @@ export default function Friends() {
           )}
 
           {friends.map((friend) => (
-            <PersonRow key={friend.id} user={friend}>
-              <SmallButton
-                disabled={busyId !== null}
-                onClick={() => removeFriend(friend)}
-                aria-label={`Remove ${friend.displayName}`}
-                className="active:text-rose-300"
-              >
-                Remove
-              </SmallButton>
-            </PersonRow>
+            <FriendCard key={friend.id} friend={friend} busy={busyId !== null} onRemove={removeFriend} />
           ))}
         </div>
       )}

@@ -110,6 +110,14 @@ export function ChevronLeftIcon(props) {
   )
 }
 
+export function ChevronDownIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </Icon>
+  )
+}
+
 export function ArchiveIcon(props) {
   return (
     <Icon {...props}>

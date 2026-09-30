@@ -72,6 +72,10 @@ export function goalsWithStatus(user) {
   }
 }
 
+export function isFinishedToday(goal) {
+  return goal.doneToday || (goal.frequency === 'weekly' && goal.weekCount >= goal.timesPerWeek)
+}
+
 export function singleGoalWithStatus(goal, user) {
   const today = todayInTimezone(user.timezone)
   const dates = findCompletionsForGoal.all(goal.id).map((row) => row.completed_on)

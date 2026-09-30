@@ -26,9 +26,9 @@ function StreakBadge({ streak, unit }) {
   )
 }
 
-function GoalMeta({ goal }) {
+export function GoalMeta({ goal, noStreakText = 'Start a streak today' }) {
   if (goal.frequency === 'daily') {
-    return goal.streak > 0 ? <StreakBadge streak={goal.streak} unit="day" /> : <span>Start a streak today</span>
+    return goal.streak > 0 ? <StreakBadge streak={goal.streak} unit="day" /> : <span>{noStreakText}</span>
   }
   return (
     <>

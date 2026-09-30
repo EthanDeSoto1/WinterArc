@@ -2,10 +2,12 @@ import express from 'express'
 import db from './db.js'
 import { requireAuth } from './auth.js'
 import { readId, readSearchQuery, readUsername } from './validation.js'
+import { goalsWithStatus, isFinishedToday } from './goals.js'
 
 const SEARCH_LIMIT = 20
 
 const findUserById = db.prepare('SELECT id, username, display_name FROM users WHERE id = ?')
+const findUserWithTimezone = db.prepare('SELECT id, username, display_name, timezone FROM users WHERE id = ?')
 const findUserByUsername = db.prepare('SELECT id, username, display_name FROM users WHERE username = ?')
 const searchUsers = db.prepare(`
   SELECT id, username, display_name FROM users
@@ -19,11 +21,11 @@ const findFriendshipBetween = db.prepare(`
   WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)
 `)
 const findFriends = db.prepare(`
-  SELECT users.id, users.username, users.display_name
+  SELECT users.id, users.username, users.display_name, users.timezone
   FROM friendships JOIN users ON users.id = friendships.addressee_id
   WHERE friendships.requester_id = ? AND friendships.status = 'accepted'
   UNION ALL
-  SELECT users.id, users.username, users.display_name
+  SELECT users.id, users.username, users.display_name, users.timezone
   FROM friendships JOIN users ON users.id = friendships.requester_id
   WHERE friendships.addressee_id = ? AND friendships.status = 'accepted'
   ORDER BY display_name COLLATE NOCASE, username
@@ -58,6 +60,26 @@ function publicUser(user) {
     id: user.id,
     username: user.username,
     displayName: user.display_name,
+  }
+}
+
+function friendGoalToJson(goal) {
+  return {
+    id: goal.id,
+    title: goal.title,
+    frequency: goal.frequency,
+    timesPerWeek: goal.timesPerWeek,
+    doneToday: goal.doneToday,
+    weekCount: goal.weekCount,
+    streak: goal.streak,
+  }
+}
+
+function friendWithToday(friend) {
+  const { goals } = goalsWithStatus(friend)
+  return {
+    ...publicUser(friend),
+    today: { done: goals.filter(isFinishedToday).length, total: goals.length },
   }
 }
 
@@ -122,7 +144,20 @@ router.get('/users/search', requireAuth, (req, res) => {
 })
 
 router.get('/friends', requireAuth, (req, res) => {
-  res.json({ friends: findFriends.all(req.user.id, req.user.id).map(publicUser) })
+  res.json({ friends: findFriends.all(req.user.id, req.user.id).map(friendWithToday) })
+})
+
+router.get('/friends/:userId/goals', requireAuth, (req, res) => {
+  const friendId = readId(req.params.userId, 'user')
+  if (friendId.error) {
+    return res.status(400).json({ error: friendId.error })
+  }
+  if (!areFriends(req.user.id, friendId.value)) {
+    return res.status(403).json({ error: 'You can only see goals of your friends' })
+  }
+  const friend = findUserWithTimezone.get(friendId.value)
+  const { today, goals } = goalsWithStatus(friend)
+  res.json({ user: publicUser(friend), today, goals: goals.map(friendGoalToJson) })
 })
 
 router.get('/friends/requests', requireAuth, (req, res) => {
