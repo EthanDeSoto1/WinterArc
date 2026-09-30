@@ -18,18 +18,29 @@ const GROUPS = [
     switches: [
       { key: 'friendDone', label: 'A friend finishes all of today’s goals' },
       { key: 'friendGoals', label: 'Every goal a friend checks off' },
-    ],
-  },
-  {
-    title: 'Reminders',
-    hint: 'Skipped when all of today’s goals are done.',
-    switches: [
-      { key: 'remindMorning', label: 'Morning · 8 AM' },
-      { key: 'remindMidday', label: 'Midday · 12 PM' },
-      { key: 'remindEvening', label: 'Evening · 8 PM' },
+      { key: 'friendRequests', label: 'Friend requests' },
     ],
   },
 ]
+
+const REMINDERS = [
+  { key: 'remindMorning', hourKey: 'remindMorningHour', label: 'Morning', earliest: 5, latest: 10 },
+  { key: 'remindMidday', hourKey: 'remindMiddayHour', label: 'Midday', earliest: 11, latest: 16 },
+  { key: 'remindEvening', hourKey: 'remindEveningHour', label: 'Evening', earliest: 17, latest: 23 },
+]
+
+function formatHour(hour) {
+  const suffix = hour < 12 ? 'AM' : 'PM'
+  return `${hour % 12 === 0 ? 12 : hour % 12} ${suffix}`
+}
+
+function hoursBetween(earliest, latest) {
+  const hours = []
+  for (let hour = earliest; hour <= latest; hour++) {
+    hours.push(hour)
+  }
+  return hours
+}
 
 const cardClasses = 'rounded-2xl border border-white/[0.06] bg-ink-900/70 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]'
 
@@ -56,6 +67,36 @@ function Switch({ label, on, onToggle }) {
         />
       </span>
     </button>
+  )
+}
+
+function ReminderRow({ reminder, settings, onToggle, onHourChange }) {
+  const on = settings[reminder.key]
+  const hour = settings[reminder.hourKey]
+  const selectId = `reminder-${reminder.key}`
+  return (
+    <div>
+      <Switch label={`${reminder.label} · ${formatHour(hour)}`} on={on} onToggle={onToggle} />
+      {on && (
+        <div className="flex items-center justify-between gap-4 px-5 pb-3">
+          <label htmlFor={selectId} className="text-sm text-steel-400">
+            Time
+          </label>
+          <select
+            id={selectId}
+            value={hour}
+            onChange={(event) => onHourChange(Number(event.target.value))}
+            className="h-11 rounded-xl border border-white/[0.08] bg-ink-900 px-3 text-base text-ice-50 transition focus:border-ice-400/60 focus:outline-none focus:ring-4 focus:ring-ice-400/10 lg:text-sm"
+          >
+            {hoursBetween(reminder.earliest, reminder.latest).map((value) => (
+              <option key={value} value={value}>
+                {formatHour(value)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -131,9 +172,8 @@ export default function NotificationSettings() {
     setBusy(false)
   }
 
-  async function toggle(key) {
+  async function save(key, next) {
     const previous = settings
-    const next = !settings[key]
     setSettings({ ...settings, [key]: next })
     try {
       const result = await api('/push/settings', { method: 'PATCH', body: { [key]: next } })
@@ -199,12 +239,26 @@ export default function NotificationSettings() {
               <p className="mb-2 px-1 text-[13px] font-medium text-steel-400">{group.title}</p>
               <div className={`${cardClasses} divide-y divide-white/[0.05] overflow-hidden`}>
                 {group.switches.map((item) => (
-                  <Switch key={item.key} label={item.label} on={settings[item.key]} onToggle={() => toggle(item.key)} />
+                  <Switch key={item.key} label={item.label} on={settings[item.key]} onToggle={() => save(item.key, !settings[item.key])} />
                 ))}
               </div>
-              {group.hint && <p className="mt-2 px-1 text-xs text-steel-500">{group.hint}</p>}
             </div>
           ))}
+          <div>
+            <p className="mb-2 px-1 text-[13px] font-medium text-steel-400">Reminders</p>
+            <div className={`${cardClasses} divide-y divide-white/[0.05] overflow-hidden`}>
+              {REMINDERS.map((reminder) => (
+                <ReminderRow
+                  key={reminder.key}
+                  reminder={reminder}
+                  settings={settings}
+                  onToggle={() => save(reminder.key, !settings[reminder.key])}
+                  onHourChange={(hour) => save(reminder.hourKey, hour)}
+                />
+              ))}
+            </div>
+            <p className="mt-2 px-1 text-xs text-steel-500">In your profile’s timezone. Skipped when all of today’s goals are done.</p>
+          </div>
           <p className="px-1 text-xs text-steel-500">These choices apply to every device where notifications are on.</p>
         </div>
       )}

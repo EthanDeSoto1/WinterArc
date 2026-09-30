@@ -35,6 +35,15 @@ export function notifyActivity(userId) {
   sendToUserAndFriends(userId, 'activity')
 }
 
+export function notifyFriendship(userIdA, userIdB) {
+  sendTo(userIdA, 'activity', { userId: null })
+  sendTo(userIdB, 'activity', { userId: null })
+}
+
+export function notifyBoardSeen(userId) {
+  sendTo(userId, 'board-seen', { userId })
+}
+
 export function notifyBoard(userId) {
   for (const id of connectionsByUser.keys()) {
     sendTo(id, 'board', { userId })

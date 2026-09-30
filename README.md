@@ -18,6 +18,8 @@ Dockerfile           Builds the client, then runs the server
 docker-compose.yml   Runs the container
 scripts/backup.sh    Backs up the database to backups/
 scripts/restore.sh   Puts a backup back in place
+scripts/deploy.sh    Backs up, pulls from GitHub, rebuilds and checks health
+scripts/reset-password.sh  Gives someone a temporary password
 .env.example         Copy to .env and fill in
 ```
 
@@ -61,6 +63,7 @@ Run these on your Linux server, inside the project folder (for example `~/winter
 | Restart | `docker compose restart` |
 | Stop | `docker compose down` |
 | Update after code changes | `docker compose up -d --build` |
+| Update from GitHub (when the folder is a git clone) | `bash scripts/deploy.sh` |
 
 `docker compose ps` shows `(healthy)` about 10 seconds after starting.
 
@@ -149,6 +152,14 @@ bash scripts/restore.sh backups/winter-arc-2026-10-01-033000.db
 ```
 
 The script first saves the current database as `backups/before-restore-<date>.db` (if the app is running), so you can undo the restore by restoring that file. Then it stops the app, puts the backup in place, copies back any photos from `backups/photos/` that are missing, and starts the app again. Run `docker compose ps` after about 10 seconds and check it shows `(healthy)`.
+
+### Someone forgot their password
+
+```bash
+bash scripts/reset-password.sh <username>
+```
+
+It prints a temporary password, signs that person out on every device and turns off their notifications (they turn them on again in Account). Send them the temporary password privately and ask them to change it in **Account → Password**.
 
 ## 5. Sharing with friends
 

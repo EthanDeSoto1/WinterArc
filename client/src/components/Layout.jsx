@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../AuthContext.jsx'
+import { api } from '../api.js'
 import { syncPush } from '../push.js'
 import { Avatar } from './PersonRow.jsx'
 import { AccountIcon, BoardIcon, CalendarIcon, FriendsIcon, TodayIcon } from './Icons.jsx'
@@ -23,6 +24,19 @@ function announceActivity(userId) {
 
 function announceBoard() {
   window.dispatchEvent(new Event('winterarc:board'))
+}
+
+function UnreadDot({ className = '' }) {
+  return (
+    <span
+      className={`absolute size-2 rounded-full bg-ice-300 shadow-[0_0_8px_rgb(174_219_255/0.9)] ring-2 ring-black ${className}`}
+      aria-hidden="true"
+    />
+  )
+}
+
+function tabLabel(tab, boardUnread) {
+  return tab.to === '/board' && boardUnread ? `${tab.label}, new posts` : undefined
 }
 
 function useIsDesktop() {
@@ -76,7 +90,7 @@ function LinkStatus({ status }) {
   )
 }
 
-function DesktopRail({ linkStatus }) {
+function DesktopRail({ linkStatus, boardUnread }) {
   const { user } = useAuth()
   const location = useLocation()
   const activeIndex = activeTabIndex(location.pathname)
@@ -114,10 +128,14 @@ function DesktopRail({ linkStatus }) {
                   }`
                 }
                 style={{ height: RAIL_ITEM_HEIGHT }}
+                aria-label={tabLabel(tab, boardUnread)}
               >
-                <tab.icon
-                  className={`size-5 transition ${index === activeIndex ? 'text-ice-200 drop-shadow-[0_0_8px_rgb(174_219_255/0.6)]' : 'group-hover:text-steel-200'}`}
-                />
+                <span className="relative">
+                  <tab.icon
+                    className={`size-5 transition ${index === activeIndex ? 'text-ice-200 drop-shadow-[0_0_8px_rgb(174_219_255/0.6)]' : 'group-hover:text-steel-200'}`}
+                  />
+                  {tab.to === '/board' && boardUnread && <UnreadDot className="-top-0.5 -right-0.5" />}
+                </span>
                 <span className="flex-1">{tab.label}</span>
                 <kbd className="rounded-md border border-white/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-steel-500 opacity-0 transition group-hover:opacity-100">
                   {index + 1}
@@ -147,7 +165,7 @@ function DesktopRail({ linkStatus }) {
   )
 }
 
-function MobileTabs() {
+function MobileTabs({ boardUnread }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-white/[0.06] bg-black/75 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
       <ul className="mx-auto flex max-w-md">
@@ -156,6 +174,7 @@ function MobileTabs() {
             <NavLink
               to={tab.to}
               end={tab.end}
+              aria-label={tabLabel(tab, boardUnread)}
               className={({ isActive }) =>
                 `relative flex min-h-[4.5rem] flex-col items-center justify-center gap-1 text-[11px] font-medium tracking-wide whitespace-nowrap transition-colors ${
                   isActive ? 'text-ice-100' : 'text-steel-500 active:text-steel-300'
@@ -167,7 +186,10 @@ function MobileTabs() {
                   {isActive && (
                     <span className="absolute top-0 h-px w-10 bg-gradient-to-r from-transparent via-ice-300 to-transparent shadow-[0_0_12px_2px_rgb(174_219_255/0.45)]" />
                   )}
-                  <tab.icon className={`size-6 ${isActive ? 'drop-shadow-[0_0_8px_rgb(174_219_255/0.5)]' : ''}`} />
+                  <span className="relative">
+                    <tab.icon className={`size-6 ${isActive ? 'drop-shadow-[0_0_8px_rgb(174_219_255/0.5)]' : ''}`} />
+                    {tab.to === '/board' && boardUnread && <UnreadDot className="-top-0.5 -right-1" />}
+                  </span>
                   {tab.label}
                 </>
               )}
@@ -188,9 +210,40 @@ export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [linkStatus, setLinkStatus] = useState('connecting')
+  const [hasUnreadPosts, setHasUnreadPosts] = useState(false)
+  const boardUnread = hasUnreadPosts && location.pathname !== '/board'
 
   useEffect(() => {
     syncPush().catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    let latestRequest = 0
+    function loadUnread() {
+      latestRequest += 1
+      const request = latestRequest
+      api('/posts/unread')
+        .then((result) => {
+          if (request === latestRequest) {
+            setHasUnreadPosts(result.unread)
+          }
+        })
+        .catch(() => {})
+    }
+    function handleVisible() {
+      if (document.visibilityState === 'visible') {
+        loadUnread()
+      }
+    }
+    loadUnread()
+    window.addEventListener('winterarc:board', loadUnread)
+    window.addEventListener('winterarc:board-seen', loadUnread)
+    document.addEventListener('visibilitychange', handleVisible)
+    return () => {
+      window.removeEventListener('winterarc:board', loadUnread)
+      window.removeEventListener('winterarc:board-seen', loadUnread)
+      document.removeEventListener('visibilitychange', handleVisible)
+    }
   }, [])
 
   useEffect(() => {
@@ -212,6 +265,9 @@ export default function Layout() {
         announceActivity(JSON.parse(event.data).userId)
       })
       source.addEventListener('board', announceBoard)
+      source.addEventListener('board-seen', () => {
+        window.dispatchEvent(new Event('winterarc:board-seen'))
+      })
       source.addEventListener('error', () => {
         lostConnection = true
         setLinkStatus('reconnecting')
@@ -261,7 +317,7 @@ export default function Layout() {
   if (isDesktop) {
     return (
       <div className="desktop-shell min-h-dvh pl-64">
-        <DesktopRail linkStatus={linkStatus} />
+        <DesktopRail linkStatus={linkStatus} boardUnread={boardUnread} />
         <div key={location.pathname} className="animate-page-in">
           <Outlet />
         </div>
@@ -272,7 +328,7 @@ export default function Layout() {
   return (
     <div className="min-h-dvh pb-[calc(4.5rem+env(safe-area-inset-bottom))]">
       <Outlet />
-      <MobileTabs />
+      <MobileTabs boardUnread={boardUnread} />
     </div>
   )
 }

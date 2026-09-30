@@ -35,7 +35,8 @@ export default function PostComments({ post, board, timezone, onChange, onError 
   }
 
   async function handleDelete(comment) {
-    if (!window.confirm('Delete this comment?')) {
+    const question = comment.isYours ? 'Delete this comment?' : `Delete ${comment.user.displayName}’s comment on your post?`
+    if (!window.confirm(question)) {
       return
     }
     setDeletingId(comment.id)
@@ -68,12 +69,12 @@ export default function PostComments({ post, board, timezone, onChange, onError 
                 </p>
                 <p className="mt-0.5 text-sm leading-snug break-words text-steel-200">{comment.body}</p>
               </div>
-              {comment.isYours && (
+              {comment.canDelete && (
                 <button
                   type="button"
                   onClick={() => handleDelete(comment)}
                   disabled={deletingId === comment.id}
-                  aria-label="Delete your comment"
+                  aria-label={comment.isYours ? 'Delete your comment' : `Delete ${comment.user.displayName}’s comment`}
                   className="-mr-2 flex size-11 shrink-0 items-center justify-center rounded-full text-steel-500 transition active:text-rose-300 disabled:opacity-40 lg:hover:text-rose-300"
                 >
                   <CrossIcon className="size-4" />

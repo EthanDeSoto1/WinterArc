@@ -56,6 +56,8 @@ export default function AddFriendPanel({ onFriendsChange }) {
 
   useEffect(() => {
     loadRequests()
+    window.addEventListener('winterarc:activity', loadRequests)
+    return () => window.removeEventListener('winterarc:activity', loadRequests)
   }, [])
 
   useEffect(() => {

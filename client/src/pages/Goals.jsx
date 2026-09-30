@@ -4,7 +4,7 @@ import { api } from '../api.js'
 import Page from '../components/Page.jsx'
 import GoalForm from '../components/GoalForm.jsx'
 import { SectionTitle } from '../components/PersonRow.jsx'
-import { FormError, PrimaryButton, SecondaryButton } from '../components/Form.jsx'
+import { FormError, PrimaryButton, SecondaryButton, SmallButton } from '../components/Form.jsx'
 import { ArchiveIcon, ArrowDownIcon, ArrowUpIcon, PencilIcon, PlusIcon, ReorderIcon } from '../components/Icons.jsx'
 import { EmptyState, ErrorState, LoadingState, Toast } from '../components/States.jsx'
 
@@ -38,6 +38,9 @@ export default function Goals() {
   const [draft, setDraft] = useState(null)
   const [savingOrder, setSavingOrder] = useState(false)
   const [orderError, setOrderError] = useState('')
+  const [archived, setArchived] = useState([])
+  const [showArchived, setShowArchived] = useState(false)
+  const [restoringId, setRestoringId] = useState(null)
 
   function loadGoals() {
     setStatus('loading')
@@ -52,8 +55,15 @@ export default function Goals() {
       })
   }
 
+  function loadArchived() {
+    api('/goals/archived')
+      .then((result) => setArchived(result.goals))
+      .catch(() => {})
+  }
+
   useEffect(() => {
     loadGoals()
+    loadArchived()
   }, [])
 
   useEffect(() => {
@@ -77,16 +87,30 @@ export default function Goals() {
   }
 
   async function archiveGoal(goal) {
-    const confirmed = window.confirm(`Archive “${goal.title}”? It leaves your list, but its history is kept.`)
+    const confirmed = window.confirm(`Archive “${goal.title}”? It leaves your list, but its history is kept. You can restore it from Archived below.`)
     if (!confirmed) {
       return
     }
     try {
       await api(`/goals/${goal.id}/archive`, { method: 'POST' })
       setGoals(goals.filter((item) => item.id !== goal.id))
+      loadArchived()
     } catch (error) {
       setToast(error.message)
     }
+  }
+
+  async function restoreGoal(goal) {
+    setRestoringId(goal.id)
+    try {
+      const result = await api(`/goals/${goal.id}/restore`, { method: 'POST' })
+      setGoals([...goals, result.goal])
+      setArchived(archived.filter((item) => item.id !== goal.id))
+    } catch (error) {
+      setToast(error.message)
+      loadArchived()
+    }
+    setRestoringId(null)
   }
 
   function startReorder() {
@@ -263,6 +287,32 @@ export default function Goals() {
               </section>
             )
           })}
+
+          {archived.length > 0 && (
+            <section className="mt-6">
+              <button
+                type="button"
+                onClick={() => setShowArchived(!showArchived)}
+                aria-expanded={showArchived}
+                className="flex min-h-11 w-full items-center justify-between rounded-xl px-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-steel-500 transition active:text-steel-300"
+              >
+                <span>Archived ({archived.length})</span>
+                <span className="text-xs font-medium tracking-normal normal-case">{showArchived ? 'Hide' : 'Show'}</span>
+              </button>
+              {showArchived && (
+                <div className="mt-2 flex flex-col gap-2.5">
+                  <p className="px-1 text-xs text-steel-500">Restoring puts a goal back on Today. Its check-offs were kept.</p>
+                  {archived.map((goal) => (
+                    <GoalCard key={goal.id} goal={goal}>
+                      <SmallButton onClick={() => restoreGoal(goal)} disabled={restoringId !== null}>
+                        {restoringId === goal.id ? 'Restoring…' : 'Restore'}
+                      </SmallButton>
+                    </GoalCard>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </div>
       )}
       <Toast message={toast} />

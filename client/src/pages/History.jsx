@@ -413,7 +413,7 @@ function FriendsMonthly() {
   if (months.length === 0) {
     return (
       <EmptyState
-        title="First results on November 1"
+        title="First results on November 2"
         message="When a month ends, you'll see how you and your friends did, ranked by the share of daily goals checked off."
       />
     )

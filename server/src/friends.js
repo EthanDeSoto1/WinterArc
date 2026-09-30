@@ -3,6 +3,8 @@ import db from './db.js'
 import { requireAuth } from './auth.js'
 import { readId, readSearchQuery, readUsername } from './validation.js'
 import { goalsWithStatus, isFinishedToday } from './goals.js'
+import { notifyFriendship } from './events.js'
+import { notifyFriendRequest, notifyRequestAccepted } from './push.js'
 
 const SEARCH_LIMIT = 20
 
@@ -189,6 +191,8 @@ router.post('/friends/requests', requireAuth, (req, res) => {
   }
   if (existing) {
     acceptRequest.run(existing.id)
+    notifyFriendship(req.user.id, target.value.id)
+    notifyRequestAccepted(req.user, target.value.id)
     return res.json({ user: userWithFriendship(target.value, req.user.id) })
   }
 
@@ -203,6 +207,8 @@ router.post('/friends/requests', requireAuth, (req, res) => {
     }
     throw insertError
   }
+  notifyFriendship(req.user.id, target.value.id)
+  notifyFriendRequest(req.user, target.value.id)
   res.status(201).json({ user: userWithFriendship(target.value, req.user.id) })
 })
 
@@ -215,6 +221,8 @@ router.post('/friends/requests/:id/accept', requireAuth, (req, res) => {
     return res.status(403).json({ error: 'Only the person who was asked can accept' })
   }
   acceptRequest.run(request.id)
+  notifyFriendship(req.user.id, request.requester_id)
+  notifyRequestAccepted(req.user, request.requester_id)
   res.json({ user: userWithFriendship(findUserById.get(request.requester_id), req.user.id) })
 })
 
@@ -227,6 +235,7 @@ router.post('/friends/requests/:id/decline', requireAuth, (req, res) => {
     return res.status(403).json({ error: 'Only the person who was asked can decline' })
   }
   deleteFriendship.run(request.id)
+  notifyFriendship(req.user.id, request.requester_id)
   res.status(204).end()
 })
 
@@ -239,6 +248,7 @@ router.delete('/friends/requests/:id', requireAuth, (req, res) => {
     return res.status(403).json({ error: 'Only the person who sent a request can cancel it' })
   }
   deleteFriendship.run(request.id)
+  notifyFriendship(req.user.id, request.addressee_id)
   res.status(204).end()
 })
 
@@ -251,6 +261,7 @@ router.delete('/friends/:userId', requireAuth, (req, res) => {
     return res.status(404).json({ error: 'You aren’t friends with that person' })
   }
   deleteFriendshipBetween.run(req.user.id, friendId.value, friendId.value, req.user.id)
+  notifyFriendship(req.user.id, friendId.value)
   res.status(204).end()
 })
 

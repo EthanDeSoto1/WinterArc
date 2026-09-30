@@ -2,7 +2,7 @@ import express from 'express'
 import webpush from 'web-push'
 import db from './db.js'
 import { requireAuth } from './auth.js'
-import { readPushEndpoint, readPushSubscription, readSwitch, firstError } from './validation.js'
+import { readPushEndpoint, readPushSubscription, readSwitch, readReminderHour, firstError } from './validation.js'
 
 const MAX_DEVICES_PER_USER = 10
 const DAY_SECONDS = 24 * 60 * 60
@@ -12,9 +12,15 @@ const SETTING_COLUMNS = {
   myPosts: 'notify_my_posts',
   friendDone: 'notify_friend_done',
   friendGoals: 'notify_friend_goals',
+  friendRequests: 'notify_friend_requests',
   remindMorning: 'remind_morning',
   remindMidday: 'remind_midday',
   remindEvening: 'remind_evening',
+}
+const REMINDER_HOURS = {
+  remindMorningHour: { column: 'remind_morning_hour', earliest: 5, latest: 10 },
+  remindMiddayHour: { column: 'remind_midday_hour', earliest: 11, latest: 16 },
+  remindEveningHour: { column: 'remind_evening_hour', earliest: 17, latest: 23 },
 }
 
 const publicKey = process.env.VAPID_PUBLIC_KEY || ''
@@ -59,13 +65,26 @@ const updateSetting = {}
 for (const [key, column] of Object.entries(SETTING_COLUMNS)) {
   updateSetting[key] = db.prepare(`UPDATE users SET ${column} = ? WHERE id = ?`)
 }
+for (const [key, hour] of Object.entries(REMINDER_HOURS)) {
+  updateSetting[key] = db.prepare(`UPDATE users SET ${hour.column} = ? WHERE id = ?`)
+}
 
 function settingsToJson(user) {
   const settings = {}
   for (const [key, column] of Object.entries(SETTING_COLUMNS)) {
     settings[key] = user[column] === 1
   }
+  for (const [key, hour] of Object.entries(REMINDER_HOURS)) {
+    settings[key] = user[hour.column]
+  }
   return settings
+}
+
+function readSetting(key, value) {
+  if (Object.hasOwn(REMINDER_HOURS, key)) {
+    return readReminderHour(value, REMINDER_HOURS[key].earliest, REMINDER_HOURS[key].latest)
+  }
+  return readSwitch(value)
 }
 
 function preview(text, length = 120) {
@@ -146,6 +165,30 @@ export function notifyCheckoff(user, goal, date, isToday) {
   }
 }
 
+export function notifyFriendRequest(sender, receiverId) {
+  const receiver = findUser.get(receiverId)
+  if (receiver.notify_friend_requests !== 1) {
+    return
+  }
+  sendToUser(receiver.id, {
+    title: `${sender.display_name} sent you a friend request`,
+    body: `@${sender.username} wants to follow your Winter Arc`,
+    url: '/friends?add=1',
+  })
+}
+
+export function notifyRequestAccepted(accepter, requesterId) {
+  const requester = findUser.get(requesterId)
+  if (requester.notify_friend_requests !== 1) {
+    return
+  }
+  sendToUser(requester.id, {
+    title: `${accepter.display_name} accepted your friend request`,
+    body: 'You can now see each other’s goals',
+    url: '/friends',
+  })
+}
+
 export function notifyDayDone(user, goalCount, today) {
   if (!markSentOnce(user.id, 'day-done', today)) {
     return
@@ -198,10 +241,10 @@ router.patch('/push/settings', requireAuth, (req, res) => {
   if (keys.length === 0) {
     return res.status(400).json({ error: 'Nothing to update' })
   }
-  if (keys.some((key) => !Object.hasOwn(SETTING_COLUMNS, key))) {
+  if (keys.some((key) => !Object.hasOwn(SETTING_COLUMNS, key) && !Object.hasOwn(REMINDER_HOURS, key))) {
     return res.status(400).json({ error: 'Unknown notification setting' })
   }
-  const values = keys.map((key) => readSwitch(req.body[key]))
+  const values = keys.map((key) => readSetting(key, req.body[key]))
   const error = firstError(values)
   if (error) {
     return res.status(400).json({ error })

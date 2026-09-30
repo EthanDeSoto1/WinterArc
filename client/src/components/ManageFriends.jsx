@@ -11,21 +11,32 @@ export default function ManageFriends() {
   const [removeError, setRemoveError] = useState('')
   const [busyId, setBusyId] = useState(null)
 
-  function loadFriends() {
-    setStatus('loading')
+  function loadFriends(showSpinner) {
+    if (showSpinner) {
+      setStatus('loading')
+    }
     api('/friends')
       .then((result) => {
         setFriends(result.friends)
         setStatus('ready')
       })
       .catch((error) => {
-        setLoadError(error.message)
-        setStatus('error')
+        if (showSpinner) {
+          setLoadError(error.message)
+          setStatus('error')
+        }
       })
   }
 
   useEffect(() => {
-    loadFriends()
+    loadFriends(true)
+    function handleActivity(event) {
+      if (event.detail.userId === null) {
+        loadFriends(false)
+      }
+    }
+    window.addEventListener('winterarc:activity', handleActivity)
+    return () => window.removeEventListener('winterarc:activity', handleActivity)
   }, [])
 
   async function removeFriend(friend) {
@@ -53,7 +64,7 @@ export default function ManageFriends() {
           Loading friends…
         </div>
       )}
-      {status === 'error' && <ErrorState message={loadError} onRetry={loadFriends} />}
+      {status === 'error' && <ErrorState message={loadError} onRetry={() => loadFriends(true)} />}
       {status === 'ready' && friends.length === 0 && <p className="px-1 text-sm text-steel-500">You don’t have any friends added yet.</p>}
       {status === 'ready' && friends.length > 0 && (
         <div className="flex flex-col gap-2.5">

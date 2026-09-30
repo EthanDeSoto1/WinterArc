@@ -5,9 +5,9 @@ import { seasonRange } from './dates.js'
 
 const CHECK_EVERY_MS = 60 * 1000
 const REMINDERS = [
-  { column: 'remind_morning', kind: 'remind-morning', hour: 8, title: 'Morning check-in' },
-  { column: 'remind_midday', kind: 'remind-midday', hour: 12, title: 'Midday check-in' },
-  { column: 'remind_evening', kind: 'remind-evening', hour: 20, title: 'Evening check-in' },
+  { column: 'remind_morning', kind: 'remind-morning', hourColumn: 'remind_morning_hour', title: 'Morning check-in' },
+  { column: 'remind_midday', kind: 'remind-midday', hourColumn: 'remind_midday_hour', title: 'Midday check-in' },
+  { column: 'remind_evening', kind: 'remind-evening', hourColumn: 'remind_evening_hour', title: 'Evening check-in' },
 ]
 
 const findUsersWithReminders = db.prepare(`
@@ -33,7 +33,7 @@ function goalsLeftText(goals) {
 export function sendDueReminders(now = new Date()) {
   for (const user of findUsersWithReminders.all()) {
     const hour = hourInTimezone(user.timezone, now)
-    const reminder = REMINDERS.find((item) => item.hour === hour && user[item.column] === 1)
+    const reminder = REMINDERS.find((item) => user[item.hourColumn] === hour && user[item.column] === 1)
     if (!reminder) {
       continue
     }

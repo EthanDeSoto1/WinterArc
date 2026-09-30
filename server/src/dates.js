@@ -170,7 +170,7 @@ export function finishedSeasonMonths(today) {
   const year = season.start.slice(0, 4)
   return ['10', '11', '12']
     .map((month) => `${year}-${month}`)
-    .filter((month) => month < today.slice(0, 7))
+    .filter((month) => month < addDays(today, -1).slice(0, 7))
     .reverse()
 }
 

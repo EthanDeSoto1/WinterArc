@@ -6,6 +6,7 @@ import { Avatar } from '../components/PersonRow.jsx'
 import PostComposer from '../components/PostComposer.jsx'
 import PostComments from '../components/PostComments.jsx'
 import { SmallButton } from '../components/Form.jsx'
+import { CrossIcon } from '../components/Icons.jsx'
 import { EmptyState, ErrorState, LoadingState, Toast } from '../components/States.jsx'
 import { formatPostedWhen } from '../dates.js'
 
@@ -44,7 +45,55 @@ function reactionLabel(info, reaction, me) {
   return names.length === 0 ? `${info.label}, 0` : `${info.label}, ${names.length}: ${names.join(', ')}`
 }
 
-function PostCard({ post, board, me, timezone, onReact, onDelete, onChange, onError, deleting }) {
+function photoAlt(post) {
+  return `Photo from ${post.isYours ? 'you' : post.user.displayName}`
+}
+
+function PhotoViewer({ post, onClose }) {
+  useEffect(() => {
+    function handleKey(event) {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKey)
+    return () => {
+      document.body.style.overflow = overflow
+      window.removeEventListener('keydown', handleKey)
+    }
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={photoAlt(post)}
+      onClick={onClose}
+      className="fixed inset-0 z-30 flex animate-fade-up items-center justify-center bg-black/95 px-2 pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur"
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        autoFocus
+        aria-label="Close photo"
+        className="absolute top-[calc(0.5rem+env(safe-area-inset-top))] right-2 flex size-11 items-center justify-center rounded-full bg-white/10 text-ice-50 transition active:bg-white/20 lg:hover:bg-white/20"
+      >
+        <CrossIcon className="size-5" />
+      </button>
+      <img
+        src={`/api/posts/${post.id}/photo`}
+        alt={photoAlt(post)}
+        width={post.photo.width}
+        height={post.photo.height}
+        className="h-auto max-h-full w-auto max-w-full object-contain"
+      />
+    </div>
+  )
+}
+
+function PostCard({ post, board, me, timezone, onReact, onDelete, onChange, onError, onOpenPhoto, deleting }) {
   return (
     <li className="rounded-2xl border border-white/[0.06] bg-ink-900/70 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)] transition lg:hover:border-ice-300/30 lg:hover:shadow-[0_0_28px_-12px_rgb(174_219_255/0.5)]">
       <div className="flex items-center gap-3">
@@ -68,14 +117,21 @@ function PostCard({ post, board, me, timezone, onReact, onDelete, onChange, onEr
       </div>
       {post.body && <p className="mt-3 text-[15px] leading-relaxed whitespace-pre-wrap break-words text-steel-200">{post.body}</p>}
       {post.photo && (
-        <img
-          src={`/api/posts/${post.id}/photo`}
-          alt={`Photo from ${post.isYours ? 'you' : post.user.displayName}`}
-          width={post.photo.width}
-          height={post.photo.height}
-          loading="lazy"
-          className="mt-3 h-auto max-h-[32rem] w-full rounded-xl border border-white/[0.06] bg-ink-850 object-contain"
-        />
+        <button
+          type="button"
+          onClick={() => onOpenPhoto(post.id)}
+          aria-label={`${photoAlt(post)}, open full screen`}
+          className="mt-3 block w-full cursor-zoom-in rounded-xl transition active:opacity-80"
+        >
+          <img
+            src={`/api/posts/${post.id}/photo`}
+            alt=""
+            width={post.photo.width}
+            height={post.photo.height}
+            loading="lazy"
+            className="h-auto max-h-[32rem] w-full rounded-xl border border-white/[0.06] bg-ink-850 object-contain"
+          />
+        </button>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         {post.reactions.map((reaction) => {
@@ -129,6 +185,7 @@ export default function Board() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [toast, setToast] = useState('')
+  const [viewingId, setViewingId] = useState(null)
   const pendingCount = useRef(0)
   const missedSync = useRef(false)
   const reactionQueue = useRef(Promise.resolve())
@@ -155,6 +212,9 @@ export default function Board() {
           setHasMore(result.hasMore)
         }
         setStatus('ready')
+        if (result.posts.length > 0 && document.visibilityState === 'visible') {
+          api('/posts/seen', { method: 'POST', body: { postId: result.posts[0].id } }).catch(() => {})
+        }
       })
       .catch((error) => {
         if (showSpinner) {
@@ -247,6 +307,12 @@ export default function Board() {
     setDeletingId(null)
   }
 
+  const viewingPost = posts.find((post) => post.id === viewingId && post.photo)
+
+  function closePhoto() {
+    setViewingId(null)
+  }
+
   function handlePosted(post) {
     setPosts((current) => [post, ...current.filter((item) => item.id !== post.id)])
   }
@@ -276,6 +342,7 @@ export default function Board() {
                   onDelete={handleDelete}
                   onChange={replacePost}
                   onError={setToast}
+                  onOpenPhoto={setViewingId}
                   deleting={deletingId === post.id}
                 />
               ))}
@@ -288,6 +355,7 @@ export default function Board() {
           )}
         </>
       )}
+      {viewingPost && <PhotoViewer post={viewingPost} onClose={closePhoto} />}
       <Toast message={toast} />
     </Page>
   )

@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import db from './db.js'
 import { requireAuth } from './auth.js'
-import { notifyBoard } from './events.js'
+import { notifyBoard, notifyBoardSeen } from './events.js'
 import { notifyNewPost, notifyReaction, notifyComment } from './push.js'
 import { publicUser } from './friends.js'
 import {
@@ -75,6 +75,10 @@ const saveReaction = db.prepare(`
     SET kind = excluded.kind, created_at = excluded.created_at
     WHERE kind <> excluded.kind
 `)
+const hasUnreadPosts = db.prepare('SELECT EXISTS (SELECT 1 FROM posts WHERE id > ? AND user_id <> ?) AS unread')
+const markBoardSeen = db.prepare(
+  'UPDATE users SET board_seen_post_id = ? WHERE id = ? AND board_seen_post_id < ? AND ? <= (SELECT coalesce(max(id), 0) FROM posts)'
+)
 const findMyReaction = db.prepare('SELECT kind FROM post_reactions WHERE post_id = ? AND user_id = ?')
 const deleteReaction = db.prepare('DELETE FROM post_reactions WHERE post_id = ? AND user_id = ? AND kind = ?')
 
@@ -107,6 +111,7 @@ function postsToJson(rows, viewer) {
         createdAt: comment.created_at,
         day: todayInTimezone(viewer.timezone, new Date(comment.created_at)),
         isYours: comment.user_id === viewer.id,
+        canDelete: comment.user_id === viewer.id || row.user_id === viewer.id,
         user: { id: comment.user_id, username: comment.username, displayName: comment.display_name, avatarColor: comment.avatar_color },
       })),
   }))
@@ -158,6 +163,22 @@ router.get('/posts', requireAuth, (req, res) => {
     posts: postsToJson(rows.slice(0, PAGE_SIZE), req.user),
     hasMore: rows.length > PAGE_SIZE,
   })
+})
+
+router.get('/posts/unread', requireAuth, (req, res) => {
+  res.json({ unread: hasUnreadPosts.get(req.user.board_seen_post_id, req.user.id).unread === 1 })
+})
+
+router.post('/posts/seen', requireAuth, (req, res) => {
+  const postId = readId(req.body.postId, 'post')
+  if (postId.error) {
+    return res.status(400).json({ error: postId.error })
+  }
+  const result = markBoardSeen.run(postId.value, req.user.id, postId.value, postId.value)
+  if (result.changes === 1) {
+    notifyBoardSeen(req.user.id)
+  }
+  res.status(204).end()
 })
 
 router.post('/posts', requireAuth, (req, res) => {
@@ -266,8 +287,8 @@ router.delete('/posts/:id/comments/:commentId', requireAuth, (req, res) => {
   if (!comment) {
     return res.status(404).json({ error: 'That comment no longer exists' })
   }
-  if (comment.user_id !== req.user.id) {
-    return res.status(403).json({ error: 'You can only delete your own comments' })
+  if (comment.user_id !== req.user.id && post.user_id !== req.user.id) {
+    return res.status(403).json({ error: 'You can only delete your own comments or comments on your posts' })
   }
   deleteComment.run(comment.id)
   notifyBoard(req.user.id)

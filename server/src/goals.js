@@ -3,7 +3,7 @@ import db from './db.js'
 import { requireAuth } from './auth.js'
 import { notifyActivity } from './events.js'
 import { notifyCheckoff, notifyDayDone } from './push.js'
-import { readGoalTitle, readFrequency, readTimesPerWeek, readGoalIds, firstError } from './validation.js'
+import { readGoalTitle, readFrequency, readTimesPerWeek, readGoalIds, readId, firstError } from './validation.js'
 import {
   todayInTimezone,
   addDays,
@@ -37,6 +37,14 @@ const updateGoal = db.prepare('UPDATE goals SET title = ?, frequency = ?, times_
 const archiveGoal = db.prepare(
   "UPDATE goals SET is_active = 0, archived_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
 )
+const findArchivedGoals = db.prepare(
+  'SELECT * FROM goals WHERE user_id = ? AND is_active = 0 ORDER BY archived_at DESC, id DESC'
+)
+const restoreGoal = db.prepare(`
+  UPDATE goals SET is_active = 1, archived_at = NULL,
+    position = (SELECT coalesce(max(position), 0) + 1 FROM goals WHERE user_id = ? AND is_active = 1)
+  WHERE id = ?
+`)
 const insertCompletion = db.prepare(`
   INSERT INTO completions (goal_id, user_id, completed_on) VALUES (?, ?, ?)
   ON CONFLICT (goal_id, completed_on) DO NOTHING
@@ -188,6 +196,41 @@ router.post('/goals/:id/archive', requireAuth, (req, res) => {
   archiveGoal.run(goal.id)
   notifyActivity(req.user.id)
   res.status(204).end()
+})
+
+router.get('/goals/archived', requireAuth, (req, res) => {
+  res.json({
+    goals: findArchivedGoals.all(req.user.id).map((goal) => ({
+      id: goal.id,
+      title: goal.title,
+      frequency: goal.frequency,
+      timesPerWeek: goal.times_per_week,
+      archivedAt: goal.archived_at,
+    })),
+  })
+})
+
+router.post('/goals/:id/restore', requireAuth, (req, res) => {
+  const id = readId(req.params.id, 'goal')
+  if (id.error) {
+    return res.status(400).json({ error: id.error })
+  }
+  const goal = findGoal.get(id.value)
+  if (!goal) {
+    return res.status(404).json({ error: 'Goal not found' })
+  }
+  if (goal.user_id !== req.user.id) {
+    return res.status(403).json({ error: 'You can only change your own goals' })
+  }
+  if (goal.is_active) {
+    return res.status(409).json({ error: 'That goal is already on your list' })
+  }
+  if (countActiveGoals.get(req.user.id).count >= MAX_ACTIVE_GOALS) {
+    return res.status(400).json({ error: `You can have up to ${MAX_ACTIVE_GOALS} active goals` })
+  }
+  restoreGoal.run(req.user.id, goal.id)
+  notifyActivity(req.user.id)
+  res.json({ goal: singleGoalWithStatus(findGoal.get(goal.id), req.user) })
 })
 
 router.post('/goals/:id/complete', requireAuth, (req, res) => {

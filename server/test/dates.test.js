@@ -181,12 +181,14 @@ test('weeks are met, missed or in progress, and a new goal is not held against i
   assert.equal(byStart('2026-10-26').status, null)
 })
 
-test('a season month counts as finished only once the next month has started', () => {
+test('a season month counts as finished from the 2nd of the next month, once yesterday can no longer change it', () => {
   assert.deepEqual(finishedSeasonMonths('2026-09-30'), [])
   assert.deepEqual(finishedSeasonMonths('2026-10-31'), [])
-  assert.deepEqual(finishedSeasonMonths('2026-11-01'), ['2026-10'])
+  assert.deepEqual(finishedSeasonMonths('2026-11-01'), [])
+  assert.deepEqual(finishedSeasonMonths('2026-11-02'), ['2026-10'])
   assert.deepEqual(finishedSeasonMonths('2026-12-15'), ['2026-11', '2026-10'])
-  assert.deepEqual(finishedSeasonMonths('2027-01-01'), ['2026-12', '2026-11', '2026-10'])
+  assert.deepEqual(finishedSeasonMonths('2027-01-01'), ['2026-11', '2026-10'])
+  assert.deepEqual(finishedSeasonMonths('2027-01-02'), ['2026-12', '2026-11', '2026-10'])
   assert.deepEqual(finishedSeasonMonths('2027-03-10'), ['2026-12', '2026-11', '2026-10'])
 })
 

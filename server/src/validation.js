@@ -219,6 +219,13 @@ export function readSwitch(value) {
   return { value: value ? 1 : 0 }
 }
 
+export function readReminderHour(value, earliest, latest) {
+  if (!Number.isInteger(value) || value < earliest || value > latest) {
+    return { error: `Reminder hours must be between ${earliest} and ${latest}` }
+  }
+  return { value }
+}
+
 export function firstError(fields) {
   const failed = fields.find((field) => field.error)
   return failed ? failed.error : null
