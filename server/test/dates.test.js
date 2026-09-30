@@ -9,6 +9,8 @@ import {
   countInWeek,
   dailyStreak,
   weeklyStreak,
+  seasonRange,
+  buildHistory,
 } from '../src/dates.js'
 
 test('today flips at local midnight, not UTC midnight', () => {
@@ -95,4 +97,84 @@ test('weekly streak counts weeks that hit the target, and an unfinished current 
   assert.equal(weeklyStreak(['2026-09-28', '2026-10-05', '2026-10-06'], 2, '2026-10-20'), 0)
   assert.equal(weeklyStreak(['2026-12-28', '2027-01-03'], 2, '2027-01-03'), 1)
   assert.equal(weeklyStreak(['2026-10-04', '2026-10-05'], 2, '2026-10-06'), 0)
+})
+
+test('the season is Oct 1 to Dec 31, and January still shows the season that just ended', () => {
+  assert.deepEqual(seasonRange('2026-09-30'), { start: '2026-10-01', end: '2026-12-31' })
+  assert.deepEqual(seasonRange('2026-11-15'), { start: '2026-10-01', end: '2026-12-31' })
+  assert.deepEqual(seasonRange('2027-01-01'), { start: '2026-10-01', end: '2026-12-31' })
+})
+
+function daily(id, startDate, dates, endDate = null) {
+  return { id, frequency: 'daily', timesPerWeek: null, startDate, endDate, dates }
+}
+
+function weekly(id, timesPerWeek, startDate, dates, endDate = null) {
+  return { id, frequency: 'weekly', timesPerWeek, startDate, endDate, dates }
+}
+
+function findDay(weeks, date) {
+  return weeks.flatMap((week) => week.days).find((day) => day.date === date)
+}
+
+test('history grades days green, yellow and red by the share of daily goals done', () => {
+  const goals = [
+    daily(1, '2026-10-01', ['2026-10-01', '2026-10-02', '2026-10-03']),
+    daily(2, '2026-10-01', ['2026-10-01', '2026-10-02']),
+    daily(3, '2026-10-01', ['2026-10-01']),
+    daily(4, '2026-10-01', ['2026-10-01']),
+  ]
+  const weeks = buildHistory(goals, '2026-10-01', '2026-12-31', '2026-10-05')
+  assert.equal(weeks[0].start, '2026-09-28')
+  assert.equal(weeks.at(-1).start, '2026-12-28')
+  assert.equal(findDay(weeks, '2026-10-01').status, 'full')
+  assert.equal(findDay(weeks, '2026-10-02').status, 'partial')
+  assert.equal(findDay(weeks, '2026-10-03').status, 'low')
+  assert.equal(findDay(weeks, '2026-10-04').status, 'low')
+  assert.deepEqual(findDay(weeks, '2026-10-02').missed, [3, 4])
+})
+
+test('today is not graded until everything is done, and future or out-of-range days are not tracked', () => {
+  const goals = [daily(1, '2026-10-01', ['2026-10-05']), daily(2, '2026-10-01', [])]
+  let weeks = buildHistory(goals, '2026-10-01', '2026-12-31', '2026-10-05')
+  assert.equal(findDay(weeks, '2026-10-05').status, 'today')
+  assert.equal(findDay(weeks, '2026-10-06').tracked, false)
+  assert.equal(findDay(weeks, '2026-09-30').outside, true)
+  weeks = buildHistory([daily(1, '2026-10-01', ['2026-10-05'])], '2026-10-01', '2026-12-31', '2026-10-05')
+  assert.equal(findDay(weeks, '2026-10-05').status, 'full')
+})
+
+test('daily goals only count on days they existed, unless checked off that day', () => {
+  const goals = [
+    daily(1, '2026-10-01', ['2026-10-01', '2026-10-02', '2026-10-03']),
+    daily(2, '2026-10-03', ['2026-10-02']),
+    daily(3, '2026-10-01', ['2026-10-01'], '2026-10-02'),
+  ]
+  const weeks = buildHistory(goals, '2026-10-01', '2026-12-31', '2026-10-05')
+  assert.deepEqual(findDay(weeks, '2026-10-01').missed, [])
+  assert.deepEqual(findDay(weeks, '2026-10-02').done, [1, 2])
+  assert.deepEqual(findDay(weeks, '2026-10-03').missed, [2])
+  assert.equal(findDay(weeks, '2026-10-02').status, 'full')
+})
+
+test('a day with no daily goals has no grade but still lists weekly check-offs', () => {
+  const weeks = buildHistory([weekly(9, 2, '2026-10-01', ['2026-10-06'])], '2026-10-01', '2026-12-31', '2026-10-07')
+  const day = findDay(weeks, '2026-10-06')
+  assert.equal(day.status, null)
+  assert.deepEqual(day.weeklyDone, [9])
+})
+
+test('weeks are met, missed or in progress, and a new goal is not held against its first partial week', () => {
+  const goals = [
+    weekly(1, 2, '2026-09-28', ['2026-09-29', '2026-10-01', '2026-10-06', '2026-10-13', '2026-10-14']),
+    weekly(2, 1, '2026-10-07', ['2026-10-14']),
+  ]
+  const weeks = buildHistory(goals, '2026-10-01', '2026-12-31', '2026-10-21')
+  const byStart = (start) => weeks.find((week) => week.start === start)
+  assert.equal(byStart('2026-09-28').status, 'met')
+  assert.equal(byStart('2026-10-05').status, 'missed')
+  assert.deepEqual(byStart('2026-10-05').goals, [{ id: 1, count: 1, target: 2, met: false }])
+  assert.equal(byStart('2026-10-12').status, 'met')
+  assert.equal(byStart('2026-10-19').status, 'inProgress')
+  assert.equal(byStart('2026-10-26').status, null)
 })

@@ -1,7 +1,7 @@
 import express from 'express'
 import db from './db.js'
 import { requireAuth } from './auth.js'
-import { readGoalTitle, readFrequency, readTimesPerWeek, firstError } from './validation.js'
+import { readGoalTitle, readFrequency, readTimesPerWeek, readGoalIds, firstError } from './validation.js'
 import {
   todayInTimezone,
   addDays,
@@ -14,7 +14,7 @@ import {
 const MAX_ACTIVE_GOALS = 30
 
 const findGoal = db.prepare('SELECT * FROM goals WHERE id = ?')
-const findActiveGoals = db.prepare('SELECT * FROM goals WHERE user_id = ? AND is_active = 1 ORDER BY created_at, id')
+const findActiveGoals = db.prepare('SELECT * FROM goals WHERE user_id = ? AND is_active = 1 ORDER BY position, id')
 const countActiveGoals = db.prepare('SELECT count(*) AS count FROM goals WHERE user_id = ? AND is_active = 1')
 const findCompletionsForUser = db.prepare(`
   SELECT completions.goal_id, completions.completed_on
@@ -23,9 +23,18 @@ const findCompletionsForUser = db.prepare(`
   WHERE goals.user_id = ? AND goals.is_active = 1
 `)
 const findCompletionsForGoal = db.prepare('SELECT completed_on FROM completions WHERE goal_id = ?')
-const insertGoal = db.prepare('INSERT INTO goals (user_id, title, frequency, times_per_week) VALUES (?, ?, ?, ?)')
+const insertGoal = db.prepare(`
+  INSERT INTO goals (user_id, title, frequency, times_per_week, position)
+  VALUES (?, ?, ?, ?, (SELECT coalesce(max(position), 0) + 1 FROM goals WHERE user_id = ?))
+`)
+const updatePosition = db.prepare('UPDATE goals SET position = ? WHERE id = ?')
+const saveOrder = db.transaction((goalIds) => {
+  goalIds.forEach((goalId, index) => updatePosition.run(index + 1, goalId))
+})
 const updateGoal = db.prepare('UPDATE goals SET title = ?, frequency = ?, times_per_week = ? WHERE id = ?')
-const archiveGoal = db.prepare('UPDATE goals SET is_active = 0 WHERE id = ?')
+const archiveGoal = db.prepare(
+  "UPDATE goals SET is_active = 0, archived_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
+)
 const insertCompletion = db.prepare(`
   INSERT INTO completions (goal_id, user_id, completed_on) VALUES (?, ?, ?)
   ON CONFLICT (goal_id, completed_on) DO NOTHING
@@ -118,8 +127,22 @@ router.post('/goals', requireAuth, (req, res) => {
     return res.status(400).json({ error: `You can have up to ${MAX_ACTIVE_GOALS} active goals` })
   }
 
-  const result = insertGoal.run(req.user.id, title.value, frequency.value, timesPerWeek.value)
+  const result = insertGoal.run(req.user.id, title.value, frequency.value, timesPerWeek.value, req.user.id)
   res.status(201).json({ goal: singleGoalWithStatus(findGoal.get(result.lastInsertRowid), req.user) })
+})
+
+router.put('/goals/order', requireAuth, (req, res) => {
+  const goalIds = readGoalIds(req.body.goalIds)
+  if (goalIds.error) {
+    return res.status(400).json({ error: goalIds.error })
+  }
+  const activeIds = findActiveGoals.all(req.user.id).map((goal) => goal.id)
+  const sameGoals = goalIds.value.length === activeIds.length && activeIds.every((id) => goalIds.value.includes(id))
+  if (!sameGoals) {
+    return res.status(409).json({ error: 'Your goals changed. Refresh and try again.' })
+  }
+  saveOrder(goalIds.value)
+  res.json(goalsWithStatus(req.user))
 })
 
 router.patch('/goals/:id', requireAuth, (req, res) => {

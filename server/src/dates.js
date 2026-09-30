@@ -63,6 +63,91 @@ export function dailyStreak(completedDates, today) {
   return streak
 }
 
+export function seasonRange(today) {
+  const year = Number(today.slice(0, 4))
+  const month = Number(today.slice(5, 7))
+  const seasonYear = month <= 6 ? year - 1 : year
+  return { start: `${seasonYear}-10-01`, end: `${seasonYear}-12-31` }
+}
+
+function isLive(goal, firstDay, lastDay) {
+  return goal.startDate <= firstDay && (goal.endDate === null || goal.endDate > lastDay)
+}
+
+function dayStatus(doneCount, total, isToday) {
+  if (total === 0) {
+    return null
+  }
+  if (doneCount === total) {
+    return 'full'
+  }
+  if (isToday) {
+    return 'today'
+  }
+  return doneCount * 2 >= total ? 'partial' : 'low'
+}
+
+function historyDay(goals, date, firstDay, lastDay, today) {
+  const outside = date < firstDay || date > lastDay
+  if (outside || date > today) {
+    return { date, tracked: false, outside, status: null, done: [], missed: [], weeklyDone: [] }
+  }
+  const counted = goals.filter(
+    (goal) => goal.frequency === 'daily' && (goal.dates.includes(date) || isLive(goal, date, date))
+  )
+  const done = counted.filter((goal) => goal.dates.includes(date)).map((goal) => goal.id)
+  const missed = counted.filter((goal) => !goal.dates.includes(date)).map((goal) => goal.id)
+  const weeklyDone = goals
+    .filter((goal) => goal.frequency === 'weekly' && goal.dates.includes(date))
+    .map((goal) => goal.id)
+  return {
+    date,
+    tracked: true,
+    outside: false,
+    status: dayStatus(done.length, counted.length, date === today),
+    done,
+    missed,
+    weeklyDone,
+  }
+}
+
+function historyWeek(goals, monday, today) {
+  if (monday > today) {
+    return { status: null, goals: [] }
+  }
+  const sunday = addDays(monday, 6)
+  const results = []
+  for (const goal of goals) {
+    if (goal.frequency !== 'weekly') {
+      continue
+    }
+    const count = countInWeek(goal.dates, monday)
+    const met = count >= goal.timesPerWeek
+    if (met || isLive(goal, monday, sunday)) {
+      results.push({ id: goal.id, count, target: goal.timesPerWeek, met })
+    }
+  }
+  let status = null
+  if (results.length > 0 && results.every((result) => result.met)) {
+    status = 'met'
+  } else if (results.length > 0) {
+    status = monday === weekStart(today) ? 'inProgress' : 'missed'
+  }
+  return { status, goals: results }
+}
+
+export function buildHistory(goals, firstDay, lastDay, today) {
+  const weeks = []
+  for (let monday = weekStart(firstDay); monday <= lastDay; monday = addDays(monday, 7)) {
+    const days = []
+    for (let offset = 0; offset < 7; offset++) {
+      days.push(historyDay(goals, addDays(monday, offset), firstDay, lastDay, today))
+    }
+    weeks.push({ start: monday, ...historyWeek(goals, monday, today), days })
+  }
+  return weeks
+}
+
 export function weeklyStreak(completedDates, timesPerWeek, today) {
   const countsByWeek = new Map()
   for (const date of completedDates) {

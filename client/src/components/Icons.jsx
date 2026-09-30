@@ -24,6 +24,17 @@ export function TodayIcon(props) {
   )
 }
 
+export function CalendarIcon(props) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+      <path d="M3.5 10h17" />
+      <path d="M8 3v4" />
+      <path d="M16 3v4" />
+    </Icon>
+  )
+}
+
 export function FriendsIcon(props) {
   return (
     <Icon {...props}>
@@ -105,6 +116,52 @@ export function ArchiveIcon(props) {
       <rect x="3" y="4" width="18" height="4.5" rx="1.2" />
       <path d="M5 8.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5" />
       <path d="M10 12.5h4" />
+    </Icon>
+  )
+}
+
+export function CheckIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </Icon>
+  )
+}
+
+export function CrossIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M6.5 6.5l11 11" />
+      <path d="M17.5 6.5l-11 11" />
+    </Icon>
+  )
+}
+
+export function ArrowUpIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 19V5" />
+      <path d="m6 11 6-6 6 6" />
+    </Icon>
+  )
+}
+
+export function ArrowDownIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5v14" />
+      <path d="m6 13 6 6 6-6" />
+    </Icon>
+  )
+}
+
+export function ReorderIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M8 20V5" />
+      <path d="m4 9 4-4 4 4" />
+      <path d="M16 4v15" />
+      <path d="m12 15 4 4 4-4" />
     </Icon>
   )
 }

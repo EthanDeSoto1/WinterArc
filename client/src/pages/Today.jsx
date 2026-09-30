@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { Link } from 'react-router'
 import { api } from '../api.js'
 import { useAuth } from '../AuthContext.jsx'
@@ -14,16 +15,21 @@ function isGoalDone(goal, field) {
   return goal[field] || (goal.frequency === 'weekly' && goal.weekCount >= goal.timesPerWeek)
 }
 
-function GoalSection({ label, goals, field, onToggle }) {
+function GoalSection({ label, goals, field, finished, onToggle }) {
   if (goals.length === 0) {
     return null
   }
   return (
     <section className="mb-6">
-      <h2 className="mb-3 px-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-steel-500">{label}</h2>
+      <h2
+        className="mb-3 px-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-steel-500"
+        style={{ viewTransitionName: `section-${label.toLowerCase()}` }}
+      >
+        {label}
+      </h2>
       <div className="flex flex-col gap-2.5">
         {goals.map((goal) => (
-          <GoalRow key={goal.id} goal={goal} done={goal[field]} onToggle={onToggle} />
+          <GoalRow key={goal.id} goal={goal} done={goal[field]} finished={finished} onToggle={onToggle} />
         ))}
       </div>
     </section>
@@ -37,6 +43,7 @@ export default function Today() {
   const [loadError, setLoadError] = useState('')
   const [day, setDay] = useState('today')
   const [pendingIds, setPendingIds] = useState([])
+  const [holdIds, setHoldIds] = useState([])
   const [toast, setToast] = useState('')
 
   function loadGoals(showSpinner) {
@@ -82,6 +89,15 @@ export default function Today() {
     }))
   }
 
+  function releaseHold(goalId) {
+    const moveGoal = () => flushSync(() => setHoldIds((ids) => ids.filter((id) => id !== goalId)))
+    if (document.startViewTransition && document.visibilityState === 'visible') {
+      document.startViewTransition(moveGoal)
+    } else {
+      moveGoal()
+    }
+  }
+
   async function toggleGoal(goal) {
     if (pendingIds.includes(goal.id)) {
       return
@@ -97,6 +113,8 @@ export default function Today() {
     }
     replaceGoal(optimisticGoal)
     setPendingIds((ids) => [...ids, goal.id])
+    setHoldIds((ids) => [...ids, goal.id])
+    setTimeout(() => releaseHold(goal.id), 600)
 
     try {
       const result = await api(`/goals/${goal.id}/complete`, { method: nowDone ? 'POST' : 'DELETE', body: { date } })
@@ -142,25 +160,29 @@ export default function Today() {
   const doneCount = goals.filter((goal) => isGoalDone(goal, field)).length
   const allDone = goals.length > 0 && doneCount === goals.length
   const shownDate = day === 'today' ? data.today : data.yesterday
+  const isFinished = (goal) => isGoalDone(goal, field) && !holdIds.includes(goal.id)
+  const openGoals = goals.filter((goal) => !isFinished(goal))
+  const finishedGoals = goals.filter((goal) => isFinished(goal))
+  const daysLeft = daysUntilNewYear(data.today)
 
   return (
     <Page eyebrow={formatDayLabel(shownDate)} title={day === 'today' ? 'Today' : 'Yesterday'} action={editLink}>
-      <div className="mb-5 flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-gradient-to-br from-ink-800/80 to-ink-900/80 px-5 py-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.05)]">
-        <div>
-          <p className="text-[44px] font-extralight leading-none tracking-tight text-ice-50 tabular-nums">
-            {daysUntilNewYear(data.today)}
+      <section className="relative mb-8 flex animate-fade-up flex-col items-center pt-4 pb-2 text-center">
+        <div
+          className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-40 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ice-400/10 blur-3xl"
+          aria-hidden="true"
+        />
+        <p className="bg-gradient-to-b from-white via-ice-100 to-ice-400/70 bg-clip-text text-[132px] leading-[0.9] font-bold tracking-[-0.06em] text-transparent tabular-nums drop-shadow-[0_0_32px_rgb(132_197_255/0.25)]">
+          {daysLeft}
+        </p>
+        <div className="mt-4 flex items-center gap-3">
+          <span className="h-px w-8 bg-gradient-to-r from-transparent to-ice-300/50" aria-hidden="true" />
+          <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-steel-400">
+            {daysLeft === 1 ? 'Day' : 'Days'} until Jan 1
           </p>
-          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-steel-500">Days until Jan 1</p>
+          <span className="h-px w-8 bg-gradient-to-l from-transparent to-ice-300/50" aria-hidden="true" />
         </div>
-        {goals.length > 0 && (
-          <div className="flex flex-col items-center gap-1.5">
-            <ProgressRing done={doneCount} total={goals.length} />
-            <p className={`text-xs font-medium ${allDone ? 'text-ice-300' : 'text-steel-400'}`}>
-              {allDone ? 'All done' : 'done'}
-            </p>
-          </div>
-        )}
-      </div>
+      </section>
 
       {goals.length === 0 ? (
         <EmptyState title="No goals yet" message="Add the habits you’ll hold yourself to until Jan 1.">
@@ -173,29 +195,38 @@ export default function Today() {
         </EmptyState>
       ) : (
         <>
-          <div className="mb-6">
-            <Segmented
-              label="Which day"
-              value={day}
-              onChange={setDay}
-              options={[
-                { value: 'today', label: 'Today' },
-                { value: 'yesterday', label: 'Yesterday' },
-              ]}
-            />
+          <div className="mb-6 flex items-center gap-4">
+            <div className="flex shrink-0 flex-col items-center gap-1">
+              <ProgressRing done={doneCount} total={goals.length} />
+              <p className={`text-xs font-medium ${allDone ? 'text-ice-300' : 'text-steel-400'}`}>
+                {allDone ? 'All done' : 'done'}
+              </p>
+            </div>
+            <div className="flex-1">
+              <Segmented
+                label="Which day"
+                value={day}
+                onChange={setDay}
+                options={[
+                  { value: 'today', label: 'Today' },
+                  { value: 'yesterday', label: 'Yesterday' },
+                ]}
+              />
+            </div>
           </div>
           <GoalSection
             label="Daily"
-            goals={goals.filter((goal) => goal.frequency === 'daily')}
+            goals={openGoals.filter((goal) => goal.frequency === 'daily')}
             field={field}
             onToggle={toggleGoal}
           />
           <GoalSection
             label="Weekly"
-            goals={goals.filter((goal) => goal.frequency === 'weekly')}
+            goals={openGoals.filter((goal) => goal.frequency === 'weekly')}
             field={field}
             onToggle={toggleGoal}
           />
+          <GoalSection label="Done" goals={finishedGoals} field={field} finished onToggle={toggleGoal} />
         </>
       )}
       <Toast message={toast} />

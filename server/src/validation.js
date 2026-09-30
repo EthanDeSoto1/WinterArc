@@ -91,6 +91,38 @@ export function readTimesPerWeek(frequency, value) {
   return { value }
 }
 
+export function readSearchQuery(value) {
+  if (typeof value !== 'string') {
+    return { value: '' }
+  }
+  const query = value.trim().toLowerCase().replace(/^@/, '')
+  if (query.length > 20 || !/^[a-z0-9_]*$/.test(query)) {
+    return { error: 'Usernames only use letters, numbers and _' }
+  }
+  return { value: query }
+}
+
+export function readId(value, name) {
+  const id = typeof value === 'string' && value.trim() !== '' ? Number(value) : value
+  if (!Number.isInteger(id) || id < 1) {
+    return { error: `Invalid ${name} id` }
+  }
+  return { value: id }
+}
+
+export function readGoalIds(value) {
+  if (!Array.isArray(value) || value.length > 100) {
+    return { error: 'goalIds must be a list of goal ids' }
+  }
+  if (!value.every((id) => Number.isInteger(id) && id > 0)) {
+    return { error: 'goalIds must be a list of goal ids' }
+  }
+  if (new Set(value).size !== value.length) {
+    return { error: 'Each goal can only appear once' }
+  }
+  return { value }
+}
+
 export function firstError(fields) {
   const failed = fields.find((field) => field.error)
   return failed ? failed.error : null

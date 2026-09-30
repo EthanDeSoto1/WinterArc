@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from 'react-router'
-import { AddFriendIcon, FriendsIcon, SettingsIcon, TodayIcon } from './Icons.jsx'
+import { AddFriendIcon, CalendarIcon, FriendsIcon, SettingsIcon, TodayIcon } from './Icons.jsx'
 
 const tabs = [
   { to: '/', label: 'Today', icon: TodayIcon, end: true },
+  { to: '/history', label: 'History', icon: CalendarIcon },
   { to: '/friends', label: 'Friends', icon: FriendsIcon },
   { to: '/add-friend', label: 'Add friend', icon: AddFriendIcon },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },

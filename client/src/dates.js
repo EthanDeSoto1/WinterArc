@@ -19,6 +19,18 @@ export function formatDayLabel(dateString) {
   return dateFromString(dateString).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
+export function formatMonthName(dateString) {
+  return dateFromString(dateString).toLocaleDateString('en-US', { month: 'long' })
+}
+
+export function formatShortDate(dateString) {
+  return dateFromString(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+export function dayOfMonth(dateString) {
+  return Number(dateString.slice(8, 10))
+}
+
 export function isMonday(dateString) {
   return dateFromString(dateString).getDay() === 1
 }

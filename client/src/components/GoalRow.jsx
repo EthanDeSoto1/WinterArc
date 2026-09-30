@@ -42,7 +42,7 @@ function GoalMeta({ goal }) {
   )
 }
 
-export default function GoalRow({ goal, done, onToggle }) {
+export default function GoalRow({ goal, done, finished = false, onToggle }) {
   const [checkCount, setCheckCount] = useState(0)
   const animate = done && checkCount > 0
 
@@ -62,11 +62,12 @@ export default function GoalRow({ goal, done, onToggle }) {
       role="checkbox"
       aria-checked={done}
       onClick={handleClick}
+      style={{ viewTransitionName: `goal-${goal.id}` }}
       className={`flex min-h-[4.25rem] w-full items-center gap-4 rounded-2xl border px-4 py-3.5 text-left transition duration-300 active:scale-[0.985] ${
         done
           ? 'border-ice-300/15 bg-ice-300/[0.035]'
           : 'border-white/[0.06] bg-ink-900/70 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)]'
-      }`}
+      } ${finished ? 'opacity-75' : ''}`}
     >
       <span className="relative flex size-8 shrink-0 items-center justify-center">
         {animate && <span key={`burst-${checkCount}`} className="absolute inset-0 animate-ring-burst rounded-full border border-ice-200" />}
@@ -95,7 +96,11 @@ export default function GoalRow({ goal, done, onToggle }) {
         </span>
       </span>
       <span className="min-w-0 flex-1">
-        <span className={`block truncate text-[15px] font-medium transition-colors ${done ? 'text-steel-400' : 'text-ice-50'}`}>
+        <span
+          className={`block truncate text-[15px] font-medium transition-colors ${done || finished ? 'text-steel-400' : 'text-ice-50'} ${
+            finished ? 'line-through decoration-steel-500/80' : ''
+          }`}
+        >
           {goal.title}
         </span>
         <span className="mt-1.5 flex items-center gap-2 text-xs text-steel-500">

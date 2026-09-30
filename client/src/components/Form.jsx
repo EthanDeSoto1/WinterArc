@@ -49,6 +49,21 @@ export function SecondaryButton({ children, className = '', ...buttonProps }) {
   )
 }
 
+export function SmallButton({ children, primary = false, className = '', ...buttonProps }) {
+  const look = primary
+    ? 'bg-ice-50 text-black shadow-[0_0_20px_-8px_rgb(174_219_255/0.6)] active:bg-ice-200'
+    : 'border border-white/10 text-steel-200 active:bg-white/5'
+  return (
+    <button
+      type="button"
+      className={`min-h-11 rounded-xl px-4 text-sm font-semibold transition active:scale-[0.97] disabled:opacity-40 ${look} ${className}`}
+      {...buttonProps}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function FormError({ message }) {
   if (!message) {
     return null
