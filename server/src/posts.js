@@ -5,7 +5,7 @@ import path from 'node:path'
 import db from './db.js'
 import { requireAuth } from './auth.js'
 import { notifyBoard } from './events.js'
-import { areFriends } from './friends.js'
+import { publicUser } from './friends.js'
 import {
   readId,
   readPostBody,
@@ -29,12 +29,6 @@ const findPosts = db.prepare(`
   FROM posts
   JOIN users ON users.id = posts.user_id
   WHERE posts.id < ?
-    AND (posts.user_id = ?
-      OR posts.user_id IN (
-        SELECT addressee_id FROM friendships WHERE requester_id = ? AND status = 'accepted'
-        UNION
-        SELECT requester_id FROM friendships WHERE addressee_id = ? AND status = 'accepted'
-      ))
   ORDER BY posts.id DESC
   LIMIT ${PAGE_SIZE + 1}
 `)
@@ -46,10 +40,12 @@ const findPost = db.prepare(`
   WHERE posts.id = ?
 `)
 const findReactions = db.prepare(`
-  SELECT post_id, kind, count(*) AS count, max(user_id = ?) AS mine
+  SELECT post_reactions.post_id, post_reactions.kind,
+    users.id, users.username, users.display_name, users.avatar_color
   FROM post_reactions
-  WHERE post_id IN (SELECT value FROM json_each(?))
-  GROUP BY post_id, kind
+  JOIN users ON users.id = post_reactions.user_id
+  WHERE post_reactions.post_id IN (SELECT value FROM json_each(?))
+  ORDER BY post_reactions.created_at, post_reactions.user_id
 `)
 const countRecentPhotos = db.prepare(`
   SELECT count(*) AS count FROM posts
@@ -69,7 +65,7 @@ const saveReaction = db.prepare(`
 const deleteReaction = db.prepare('DELETE FROM post_reactions WHERE post_id = ? AND user_id = ? AND kind = ?')
 
 function postsToJson(rows, viewer) {
-  const reactionRows = findReactions.all(viewer.id, JSON.stringify(rows.map((row) => row.id)))
+  const reactionRows = findReactions.all(JSON.stringify(rows.map((row) => row.id)))
   return rows.map((row) => ({
     id: row.id,
     body: row.body,
@@ -79,8 +75,13 @@ function postsToJson(rows, viewer) {
     photo: row.photo ? { width: row.photo_width, height: row.photo_height } : null,
     user: { id: row.user_id, username: row.username, displayName: row.display_name, avatarColor: row.avatar_color },
     reactions: REACTION_KINDS.map((kind) => {
-      const match = reactionRows.find((reaction) => reaction.post_id === row.id && reaction.kind === kind)
-      return { kind, count: match ? match.count : 0, mine: Boolean(match && match.mine) }
+      const people = reactionRows.filter((reaction) => reaction.post_id === row.id && reaction.kind === kind)
+      return {
+        kind,
+        count: people.length,
+        mine: people.some((person) => person.id === viewer.id),
+        people: people.map(publicUser),
+      }
     }),
   }))
 }
@@ -96,7 +97,7 @@ function loadVisiblePost(req, res) {
     return null
   }
   const post = findPost.get(id.value)
-  if (!post || (post.user_id !== req.user.id && !areFriends(post.user_id, req.user.id))) {
+  if (!post) {
     res.status(404).json({ error: 'That post no longer exists' })
     return null
   }
@@ -123,7 +124,7 @@ router.get('/posts', requireAuth, (req, res) => {
   if (before.error) {
     return res.status(400).json({ error: before.error })
   }
-  const rows = findPosts.all(before.value, req.user.id, req.user.id, req.user.id)
+  const rows = findPosts.all(before.value)
   const today = todayInTimezone(req.user.timezone)
   res.json({
     today,

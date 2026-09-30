@@ -23,13 +23,18 @@ export function avatarStyle(colorKey) {
   }
 }
 
-export function Avatar({ user, large = false }) {
+const AVATAR_SIZES = {
+  small: 'size-6 text-[11px]',
+  normal: 'size-10 text-[15px]',
+  large: 'size-16 text-2xl',
+}
+
+export function Avatar({ user, large = false, small = false, className = '' }) {
   const initial = Array.from(user.displayName)[0] || '?'
+  const size = large ? 'large' : small ? 'small' : 'normal'
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-full border font-semibold transition-all duration-300 ${
-        large ? 'size-16 text-2xl' : 'size-10 text-[15px]'
-      }`}
+      className={`flex shrink-0 items-center justify-center rounded-full border font-semibold transition-all duration-300 ${AVATAR_SIZES[size]} ${className}`}
       style={avatarStyle(user.avatarColor)}
       aria-hidden="true"
     >

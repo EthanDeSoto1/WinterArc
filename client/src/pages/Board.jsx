@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
 import { api } from '../api.js'
 import { useAuth } from '../AuthContext.jsx'
 import Page from '../components/Page.jsx'
@@ -8,6 +7,8 @@ import PostComposer from '../components/PostComposer.jsx'
 import { SmallButton } from '../components/Form.jsx'
 import { EmptyState, ErrorState, LoadingState, Toast } from '../components/States.jsx'
 import { formatShortDate, formatTime } from '../dates.js'
+
+const MAX_FACES = 3
 
 const REACTIONS = [
   { kind: 'fire', emoji: '🔥', label: 'Fire' },
@@ -26,22 +27,34 @@ function postedWhen(post, board, timezone) {
   return `${formatShortDate(post.day)} · ${time}`
 }
 
-function chooseReaction(post, kind) {
+function withoutMe(reaction, me) {
+  return { ...reaction, mine: false, count: reaction.count - 1, people: reaction.people.filter((person) => person.id !== me.id) }
+}
+
+function chooseReaction(post, kind, me) {
   return {
     ...post,
     reactions: post.reactions.map((reaction) => {
+      if (reaction.kind === kind && reaction.mine) {
+        return withoutMe(reaction, me)
+      }
       if (reaction.kind === kind) {
-        return { ...reaction, mine: !reaction.mine, count: reaction.count + (reaction.mine ? -1 : 1) }
+        return { ...reaction, mine: true, count: reaction.count + 1, people: [...reaction.people, me] }
       }
       if (reaction.mine) {
-        return { ...reaction, mine: false, count: reaction.count - 1 }
+        return withoutMe(reaction, me)
       }
       return reaction
     }),
   }
 }
 
-function PostCard({ post, board, timezone, onReact, onDelete, deleting }) {
+function reactionLabel(info, reaction, me) {
+  const names = reaction.people.map((person) => (person.id === me.id ? 'you' : person.displayName))
+  return names.length === 0 ? `${info.label}, 0` : `${info.label}, ${names.length}: ${names.join(', ')}`
+}
+
+function PostCard({ post, board, me, timezone, onReact, onDelete, deleting }) {
   return (
     <li className="rounded-2xl border border-white/[0.06] bg-ink-900/70 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)] transition lg:hover:border-ice-300/30 lg:hover:shadow-[0_0_28px_-12px_rgb(174_219_255/0.5)]">
       <div className="flex items-center gap-3">
@@ -83,8 +96,9 @@ function PostCard({ post, board, timezone, onReact, onDelete, deleting }) {
               type="button"
               onClick={() => onReact(post, reaction.kind)}
               aria-pressed={reaction.mine}
-              aria-label={`${info.label}, ${reaction.count}`}
-              className={`flex min-h-11 min-w-14 items-center justify-center gap-1.5 rounded-full border px-3 text-sm font-semibold tabular-nums transition active:scale-95 ${
+              aria-label={reactionLabel(info, reaction, me)}
+              title={reaction.people.length > 0 ? reactionLabel(info, reaction, me).split(': ')[1] : undefined}
+              className={`flex min-h-11 min-w-14 items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold tabular-nums transition active:scale-95 ${
                 reaction.mine
                   ? 'border-ice-300/40 bg-ice-300/[0.1] text-ice-100 shadow-[0_0_16px_-6px_rgb(174_219_255/0.7)]'
                   : 'border-white/[0.08] text-steel-400 active:bg-white/5'
@@ -93,7 +107,18 @@ function PostCard({ post, board, timezone, onReact, onDelete, deleting }) {
               <span aria-hidden="true" className="text-base">
                 {info.emoji}
               </span>
-              {reaction.count > 0 && <span>{reaction.count}</span>}
+              {reaction.people.length > 0 && (
+                <span className="flex items-center -space-x-1.5" aria-hidden="true">
+                  {reaction.people.slice(0, MAX_FACES).map((person) => (
+                    <Avatar key={person.id} user={person} small className="ring-2 ring-ink-900" />
+                  ))}
+                </span>
+              )}
+              {reaction.people.length > MAX_FACES && (
+                <span aria-hidden="true" className="text-xs">
+                  +{reaction.people.length - MAX_FACES}
+                </span>
+              )}
             </button>
           )
         })}
@@ -104,6 +129,7 @@ function PostCard({ post, board, timezone, onReact, onDelete, deleting }) {
 
 export default function Board() {
   const { user } = useAuth()
+  const me = { id: user.id, username: user.username, displayName: user.displayName, avatarColor: user.avatarColor }
   const [board, setBoard] = useState(null)
   const [posts, setPosts] = useState([])
   const [hasMore, setHasMore] = useState(false)
@@ -199,7 +225,7 @@ export default function Board() {
 
   function handleReact(post, kind) {
     const reaction = post.reactions.find((item) => item.kind === kind)
-    replacePost(chooseReaction(post, kind))
+    replacePost(chooseReaction(post, kind, me))
     pendingCount.current += 1
     reactionQueue.current = reactionQueue.current.then(async () => {
       try {
@@ -235,7 +261,7 @@ export default function Board() {
   }
 
   return (
-    <Page eyebrow="You and your friends" title="Board">
+    <Page eyebrow="Everyone on Winter Arc" title="Board">
       {status === 'loading' && <LoadingState message="Loading posts…" />}
       {status === 'error' && <ErrorState message={loadError} onRetry={() => loadBoard(true)} />}
       {status === 'ready' && (
@@ -243,11 +269,7 @@ export default function Board() {
           <PostComposer onPosted={handlePosted} />
           {posts.length === 0 && (
             <div className="mt-6">
-              <EmptyState title="Nothing posted yet" message="Share a workout, a win, or a tough day. Your friends can react to keep you going.">
-                <Link to="/add-friend" className="flex min-h-11 items-center text-sm font-semibold text-ice-300">
-                  Add friends
-                </Link>
-              </EmptyState>
+              <EmptyState title="Nothing posted yet" message="Share a workout, a win, or a tough day. Everyone can react to keep you going." />
             </div>
           )}
           {posts.length > 0 && (
@@ -257,6 +279,7 @@ export default function Board() {
                   key={post.id}
                   post={post}
                   board={board}
+                  me={me}
                   timezone={user.timezone}
                   onReact={handleReact}
                   onDelete={handleDelete}

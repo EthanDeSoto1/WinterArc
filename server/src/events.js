@@ -36,7 +36,9 @@ export function notifyActivity(userId) {
 }
 
 export function notifyBoard(userId) {
-  sendToUserAndFriends(userId, 'board')
+  for (const id of connectionsByUser.keys()) {
+    sendTo(id, 'board', { userId })
+  }
 }
 
 export function closeAllStreams() {
