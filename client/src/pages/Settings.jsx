@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { api } from '../api.js'
 import { useAuth } from '../AuthContext.jsx'
 import Page from '../components/Page.jsx'
+import ManageFriends from '../components/ManageFriends.jsx'
 import { FormError, PrimaryButton, SelectField, TextField } from '../components/Form.jsx'
 import { deviceTimezone } from '../dates.js'
 
@@ -110,7 +111,9 @@ export default function Settings() {
         </PrimaryButton>
       </form>
 
-      <p className="mt-6 px-1 text-sm text-steel-500">Signed in as {user.email}</p>
+      <ManageFriends />
+
+      <p className="mt-8 px-1 text-sm text-steel-500">Signed in as {user.email}</p>
 
       <div className="mt-4 flex flex-col gap-3">
         <FormError message={logoutError} />

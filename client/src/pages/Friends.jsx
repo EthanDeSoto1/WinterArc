@@ -3,15 +3,13 @@ import { Link } from 'react-router'
 import { api } from '../api.js'
 import Page from '../components/Page.jsx'
 import FriendCard from '../components/FriendCard.jsx'
-import { EmptyState, ErrorState, LoadingState, Toast } from '../components/States.jsx'
+import { EmptyState, ErrorState, LoadingState } from '../components/States.jsx'
 
 export default function Friends() {
   const [friends, setFriends] = useState([])
   const [incomingCount, setIncomingCount] = useState(0)
   const [status, setStatus] = useState('loading')
   const [loadError, setLoadError] = useState('')
-  const [busyId, setBusyId] = useState(null)
-  const [toast, setToast] = useState('')
 
   function loadFriends() {
     setStatus('loading')
@@ -30,29 +28,6 @@ export default function Friends() {
   useEffect(() => {
     loadFriends()
   }, [])
-
-  useEffect(() => {
-    if (!toast) {
-      return
-    }
-    const timer = setTimeout(() => setToast(''), 3500)
-    return () => clearTimeout(timer)
-  }, [toast])
-
-  async function removeFriend(friend) {
-    const confirmed = window.confirm(`Remove ${friend.displayName} as a friend? You can add each other again later.`)
-    if (!confirmed) {
-      return
-    }
-    setBusyId(friend.id)
-    try {
-      await api(`/friends/${friend.id}`, { method: 'DELETE' })
-      setFriends(friends.filter((item) => item.id !== friend.id))
-    } catch (error) {
-      setToast(error.message)
-    }
-    setBusyId(null)
-  }
 
   const eyebrow = status === 'ready' ? `${friends.length} ${friends.length === 1 ? 'friend' : 'friends'}` : 'Your crew'
 
@@ -86,11 +61,10 @@ export default function Friends() {
           )}
 
           {friends.map((friend) => (
-            <FriendCard key={friend.id} friend={friend} busy={busyId !== null} onRemove={removeFriend} />
+            <FriendCard key={friend.id} friend={friend} />
           ))}
         </div>
       )}
-      <Toast message={toast} />
     </Page>
   )
 }

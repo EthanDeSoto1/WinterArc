@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { api } from '../api.js'
 import { Avatar } from './PersonRow.jsx'
 import { GoalMeta } from './GoalRow.jsx'
-import { SmallButton } from './Form.jsx'
 import { ChevronDownIcon } from './Icons.jsx'
 import { ErrorState } from './States.jsx'
 
@@ -72,7 +71,7 @@ function FriendGoalList({ label, goals }) {
   )
 }
 
-export default function FriendCard({ friend, busy, onRemove }) {
+export default function FriendCard({ friend }) {
   const [open, setOpen] = useState(false)
   const [goals, setGoals] = useState(null)
   const [status, setStatus] = useState('idle')
@@ -119,7 +118,7 @@ export default function FriendCard({ friend, busy, onRemove }) {
       </button>
 
       {open && (
-        <div id={panelId} className="animate-fade-up border-t border-white/[0.06] px-3 pt-3 pb-3">
+        <div id={panelId} className="animate-fade-up border-t border-white/[0.06] p-3">
           {status === 'loading' && (
             <div className="flex items-center justify-center gap-3 py-6 text-sm text-steel-500" role="status">
               <div className="size-5 animate-spin rounded-full border-2 border-white/10 border-t-ice-300" />
@@ -136,16 +135,6 @@ export default function FriendCard({ friend, busy, onRemove }) {
               <FriendGoalList label="Weekly" goals={goals.filter((goal) => goal.frequency === 'weekly')} />
             </div>
           )}
-          <div className="mt-3 flex justify-end">
-            <SmallButton
-              disabled={busy}
-              onClick={() => onRemove(friend)}
-              aria-label={`Remove ${friend.displayName} as a friend`}
-              className="active:text-rose-300"
-            >
-              Remove friend
-            </SmallButton>
-          </div>
         </div>
       )}
     </div>
