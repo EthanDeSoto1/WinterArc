@@ -77,13 +77,12 @@ export function PhotoIcon(props) {
   )
 }
 
-export function SettingsIcon(props) {
+export function AccountIcon(props) {
   return (
     <Icon {...props}>
-      <path d="M20 7h-9" />
-      <path d="M14 17H5" />
-      <circle cx="17" cy="17" r="3" />
-      <circle cx="7" cy="7" r="3" />
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="10" r="3" />
+      <path d="M6.5 18.5a6.5 6.5 0 0 1 11 0" />
     </Icon>
   )
 }

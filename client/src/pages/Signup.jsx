@@ -102,7 +102,7 @@ export default function Signup() {
           spellCheck="false"
         />
         <p className="text-sm text-steel-400">
-          Timezone: <span className="font-medium text-ice-50">{timezone}</span> (from this device, change it later in Settings)
+          Timezone: <span className="font-medium text-ice-50">{timezone}</span> (from this device, change it later in Account)
         </p>
         <FormError message={error} />
         <PrimaryButton type="submit" disabled={submitting}>

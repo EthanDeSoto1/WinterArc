@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../AuthContext.jsx'
 import { Avatar } from './PersonRow.jsx'
-import { BoardIcon, CalendarIcon, FriendsIcon, SettingsIcon, TodayIcon } from './Icons.jsx'
+import { AccountIcon, BoardIcon, CalendarIcon, FriendsIcon, TodayIcon } from './Icons.jsx'
 
 const tabs = [
   { to: '/', label: 'Today', icon: TodayIcon, end: true },
   { to: '/history', label: 'History', icon: CalendarIcon },
   { to: '/friends', label: 'Friends', icon: FriendsIcon },
   { to: '/board', label: 'Board', icon: BoardIcon },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon },
+  { to: '/account', label: 'Account', icon: AccountIcon },
 ]
 
 const RECONNECT_MS = 5000

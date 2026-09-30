@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext.jsx'
 import Page from '../components/Page.jsx'
 import ManageFriends from '../components/ManageFriends.jsx'
 import AvatarColorPicker from '../components/AvatarColorPicker.jsx'
+import ChangePassword from '../components/ChangePassword.jsx'
 import { FormError, PrimaryButton, SelectField, TextField } from '../components/Form.jsx'
 import { deviceTimezone } from '../dates.js'
 
@@ -13,7 +14,7 @@ function timezoneOptions(current) {
   return zones.includes(current) ? zones : [current, ...zones]
 }
 
-export default function Settings() {
+export default function Account() {
   const { user, setUser, logout } = useAuth()
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState(user.displayName)
@@ -55,7 +56,7 @@ export default function Settings() {
   }
 
   return (
-    <Page eyebrow={`@${user.username}`} title="Settings">
+    <Page eyebrow={`@${user.username}`} title="Account">
       <form
         onSubmit={handleSave}
         className="flex flex-col gap-5 rounded-2xl border border-white/[0.06] bg-ink-900/70 p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]"
@@ -113,6 +114,8 @@ export default function Settings() {
       </form>
 
       <AvatarColorPicker />
+
+      <ChangePassword />
 
       <ManageFriends />
 

@@ -24,6 +24,8 @@ const insertUser = db.prepare(`
   VALUES (?, ?, ?, ?, ?)
 `)
 const updateUser = db.prepare('UPDATE users SET display_name = ?, timezone = ?, avatar_color = ? WHERE id = ?')
+const updatePassword = db.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+const deleteOtherSessions = db.prepare("DELETE FROM sessions WHERE json_extract(data, '$.userId') = ? AND sid != ?")
 
 const loginLimiterPerAccount = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -42,6 +44,16 @@ const loginLimiterPerDevice = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Try again in 15 minutes.' },
+})
+
+const passwordChangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  keyGenerator: (req) => `user:${req.user.id}`,
+  message: { error: 'Too many password attempts. Try again in 15 minutes.' },
 })
 
 const signupLimiter = rateLimit({
@@ -180,6 +192,31 @@ router.patch('/me', requireAuth, (req, res) => {
 
   updateUser.run(displayName.value, timezone.value, avatarColor.value, req.user.id)
   res.json({ user: userToJson(findUserById.get(req.user.id)) })
+})
+
+router.post('/me/password', requireAuth, passwordChangeLimiter, async (req, res) => {
+  const { currentPassword } = req.body
+  if (typeof currentPassword !== 'string' || currentPassword === '') {
+    return res.status(400).json({ error: 'Enter your current password' })
+  }
+  const newPassword = readNewPassword(req.body.newPassword)
+  if (newPassword.error) {
+    return res.status(400).json({ error: `New ${newPassword.error.toLowerCase()}` })
+  }
+
+  const currentMatches = currentPassword.length <= 200 && (await bcrypt.compare(currentPassword, req.user.password_hash))
+  if (!currentMatches) {
+    return res.status(403).json({ error: 'Your current password is wrong' })
+  }
+  if (newPassword.value === currentPassword) {
+    return res.status(400).json({ error: 'Pick a new password that is different from your current one' })
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword.value, PASSWORD_ROUNDS)
+  updatePassword.run(passwordHash, req.user.id)
+  await startSession(req, req.user.id)
+  const signedOut = deleteOtherSessions.run(req.user.id, req.sessionID).changes
+  res.json({ signedOut })
 })
 
 export default router
