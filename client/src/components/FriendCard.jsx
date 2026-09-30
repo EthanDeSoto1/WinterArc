@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { Avatar } from './PersonRow.jsx'
 import { GoalMeta } from './GoalRow.jsx'
@@ -77,22 +77,37 @@ export default function FriendCard({ friend }) {
   const [status, setStatus] = useState('idle')
   const [loadError, setLoadError] = useState('')
 
-  function loadGoals() {
-    setStatus('loading')
+  function loadGoals(showSpinner) {
+    if (showSpinner) {
+      setStatus('loading')
+    }
     api(`/friends/${friend.id}/goals`)
       .then((result) => {
         setGoals(result.goals)
         setStatus('ready')
       })
       .catch((error) => {
-        setLoadError(error.message)
-        setStatus('error')
+        if (showSpinner) {
+          setLoadError(error.message)
+          setStatus('error')
+        }
       })
   }
 
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    function handleActivity() {
+      loadGoals(false)
+    }
+    window.addEventListener('winterarc:activity', handleActivity)
+    return () => window.removeEventListener('winterarc:activity', handleActivity)
+  }, [open])
+
   function toggle() {
     if (!open) {
-      loadGoals()
+      loadGoals(true)
     }
     setOpen(!open)
   }
@@ -125,7 +140,7 @@ export default function FriendCard({ friend }) {
               Loading goals…
             </div>
           )}
-          {status === 'error' && <ErrorState message={loadError} onRetry={loadGoals} />}
+          {status === 'error' && <ErrorState message={loadError} onRetry={() => loadGoals(true)} />}
           {status === 'ready' && goals.length === 0 && (
             <p className="py-5 text-center text-sm text-steel-400">{friend.displayName} hasn’t added any goals yet.</p>
           )}

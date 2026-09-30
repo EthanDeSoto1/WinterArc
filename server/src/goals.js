@@ -1,6 +1,7 @@
 import express from 'express'
 import db from './db.js'
 import { requireAuth } from './auth.js'
+import { notifyActivity } from './events.js'
 import { readGoalTitle, readFrequency, readTimesPerWeek, readGoalIds, firstError } from './validation.js'
 import {
   todayInTimezone,
@@ -194,6 +195,9 @@ router.post('/goals/:id/complete', requireAuth, (req, res) => {
     return
   }
   const result = insertCompletion.run(goal.id, req.user.id, date)
+  if (result.changes === 1) {
+    notifyActivity(req.user.id)
+  }
   res.status(result.changes === 1 ? 201 : 200).json({ goal: singleGoalWithStatus(goal, req.user) })
 })
 
@@ -206,7 +210,10 @@ router.delete('/goals/:id/complete', requireAuth, (req, res) => {
   if (!date) {
     return
   }
-  deleteCompletion.run(goal.id, date)
+  const result = deleteCompletion.run(goal.id, date)
+  if (result.changes === 1) {
+    notifyActivity(req.user.id)
+  }
   res.json({ goal: singleGoalWithStatus(goal, req.user) })
 })
 

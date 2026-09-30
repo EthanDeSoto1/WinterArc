@@ -12,8 +12,10 @@ export default function Friends() {
   const [status, setStatus] = useState('loading')
   const [loadError, setLoadError] = useState('')
 
-  function loadFriends() {
-    setStatus('loading')
+  function loadFriends(showSpinner) {
+    if (showSpinner) {
+      setStatus('loading')
+    }
     Promise.all([api('/friends'), api('/friends/requests')])
       .then(([friendsResult, requestsResult]) => {
         setFriends(friendsResult.friends)
@@ -21,13 +23,20 @@ export default function Friends() {
         setStatus('ready')
       })
       .catch((error) => {
-        setLoadError(error.message)
-        setStatus('error')
+        if (showSpinner) {
+          setLoadError(error.message)
+          setStatus('error')
+        }
       })
   }
 
   useEffect(() => {
-    loadFriends()
+    loadFriends(true)
+    function handleActivity() {
+      loadFriends(false)
+    }
+    window.addEventListener('winterarc:activity', handleActivity)
+    return () => window.removeEventListener('winterarc:activity', handleActivity)
   }, [])
 
   const eyebrow = status === 'ready' ? `${friends.length} ${friends.length === 1 ? 'friend' : 'friends'}` : 'Your crew'
@@ -35,7 +44,7 @@ export default function Friends() {
   return (
     <Page eyebrow={eyebrow} title="Friends">
       {status === 'loading' && <LoadingState message="Loading friends…" />}
-      {status === 'error' && <ErrorState message={loadError} onRetry={loadFriends} />}
+      {status === 'error' && <ErrorState message={loadError} onRetry={() => loadFriends(true)} />}
       {status === 'ready' && (
         <div className="flex flex-col gap-2.5">
           {incomingCount > 0 && (

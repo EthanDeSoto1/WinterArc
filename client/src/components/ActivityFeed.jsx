@@ -76,8 +76,15 @@ export default function ActivityFeed() {
         loadFeed(false)
       }
     }
+    function handleActivity() {
+      loadFeed(false)
+    }
     document.addEventListener('visibilitychange', handleVisible)
-    return () => document.removeEventListener('visibilitychange', handleVisible)
+    window.addEventListener('winterarc:activity', handleActivity)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisible)
+      window.removeEventListener('winterarc:activity', handleActivity)
+    }
   }, [user.timezone])
 
   return (
