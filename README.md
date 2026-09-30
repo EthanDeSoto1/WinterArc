@@ -8,8 +8,6 @@ Track daily discipline goals with friends from Oct 1 to Jan 1.
 
 The whole app runs in one Docker container on a home server. It is meant to be reached only over a private [Tailscale](https://tailscale.com) network, never the public internet.
 
-> This README is filled in stage by stage. Sharing with friends, installing to the home screen and backups come later.
-
 ## Project layout
 
 ```
@@ -18,6 +16,8 @@ server/              Express API and SQLite database code
 server/src/schema.sql  Database tables, created automatically on start
 Dockerfile           Builds the client, then runs the server
 docker-compose.yml   Runs the container
+scripts/backup.sh    Backs up the database to backups/
+scripts/restore.sh   Puts a backup back in place
 .env.example         Copy to .env and fill in
 ```
 
@@ -92,6 +92,82 @@ HTTPS is required for login cookies and for installing the app on phones.
 To turn it off: `sudo tailscale serve reset`.
 
 Do **not** use `tailscale funnel`. Funnel puts the app on the public internet. `serve` keeps it inside your tailnet.
+
+## 4. Nightly backups
+
+`scripts/backup.sh` copies the live database into the `backups/` folder next to `docker-compose.yml`, as a file named like `winter-arc-2026-10-01-033000.db`. It checks that the copy is not damaged, keeps the newest 14 nightly files and deletes older ones. The app keeps running while it works.
+
+1. Run it once by hand to check it works:
+
+   ```bash
+   bash scripts/backup.sh
+   ls -l backups
+   ```
+
+2. Run it every night at 3:30 in the morning (server time). Open your crontab:
+
+   ```bash
+   crontab -e
+   ```
+
+   Add this line at the bottom, then save and exit:
+
+   ```
+   30 3 * * * bash $HOME/winter-arc/scripts/backup.sh >> $HOME/winter-arc/backups/backup.log 2>&1
+   ```
+
+   Change `$HOME/winter-arc` if your project folder is somewhere else.
+
+3. The next morning, check that it ran:
+
+   ```bash
+   tail backups/backup.log
+   ```
+
+   Each night adds a `saved backups/...` line. An error there means the backup did not happen, for example because the container was stopped.
+
+The backups hold everyone's accounts, so the folder is readable only by you. They are on the same disk as the app, so now and then copy the newest one to another computer or a USB drive too.
+
+### Restoring a backup
+
+This replaces the current database with the backup. Anything done in the app after that backup is lost.
+
+```bash
+ls -l backups
+bash scripts/restore.sh backups/winter-arc-2026-10-01-033000.db
+```
+
+The script first saves the current database as `backups/before-restore-<date>.db` (if the app is running), so you can undo the restore by restoring that file. Then it stops the app, puts the backup in place and starts the app again. Run `docker compose ps` after about 10 seconds and check it shows `(healthy)`.
+
+## 5. Sharing with friends
+
+Friends reach the app through **Tailscale machine sharing**. They get access to this one server, not to the rest of your tailnet.
+
+1. In the Tailscale admin console, open **Machines** (https://login.tailscale.com/admin/machines).
+2. Find your server, click the **...** menu next to it, then **Share...**.
+3. Copy the invite link and send it to your friend. Each link works for one person.
+4. Your friend:
+   1. Installs the Tailscale app on their phone (App Store or Google Play) and signs in. Any account works, such as Google or Apple.
+   2. Opens the invite link and accepts it with the same account.
+   3. Turns Tailscale on in the app.
+   4. Opens `https://<machine-name>.<tailnet>.ts.net` in their phone's browser.
+5. Give them the invite code from your `.env` so they can sign up.
+
+Tailscale must be switched on whenever they use the app. Without it, the app shows a "Could not reach Winter Arc" screen.
+
+If you ever changed your tailnet's access rules, make sure people you share with can still reach this machine.
+
+Never use `tailscale funnel` to "make sharing easier". It puts the app on the public internet.
+
+## 6. Installing on a phone
+
+Winter Arc can be added to the home screen and opens full screen, like an app.
+
+**iPhone:** open the site in **Safari**, tap the **Share** button, then **Add to Home Screen**, then **Add**. It has to be Safari; other iPhone browsers may not offer this.
+
+**Android:** open the site in **Chrome**, tap the **⋮** menu, then **Install app** (on some phones it says **Add to Home screen**), then **Install**.
+
+The app updates by itself after you deploy a new version. If something looks stale, close it fully and open it again.
 
 ## Local development (optional)
 
