@@ -1,4 +1,5 @@
 const REQUEST_TIMEOUT_MS = 10000
+const UPLOAD_TIMEOUT_MS = 60000
 
 function connectionError(message) {
   const error = new Error(message)
@@ -11,14 +12,15 @@ export async function api(path, options = {}) {
     throw connectionError('You’re offline.')
   }
 
+  const isFile = options.body instanceof Blob
   let response
   try {
     response = await fetch(`/api${path}`, {
       method: options.method || 'GET',
-      headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      headers: options.body ? { 'Content-Type': isFile ? options.body.type : 'application/json' } : undefined,
+      body: options.body && !isFile ? JSON.stringify(options.body) : options.body,
       credentials: 'same-origin',
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(isFile ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS),
     })
   } catch (fetchError) {
     if (navigator.onLine === false) {

@@ -145,11 +145,26 @@ export function readPostBody(value) {
   if (typeof value !== 'string' || value.trim() === '') {
     return { error: 'Write something first' }
   }
-  const body = value.replace(/\r\n?/g, '\n').trim().replace(/\n{3,}/g, '\n\n')
+  const body = value.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').trim().replace(/\n{3,}/g, '\n\n')
   if (body.length > 500) {
     return { error: 'Posts must be 500 characters or fewer' }
   }
   return { value: body }
+}
+
+export function readCaption(value) {
+  if (value === undefined || (typeof value === 'string' && value.trim() === '')) {
+    return { value: '' }
+  }
+  return readPostBody(value)
+}
+
+export function readPhotoSide(value) {
+  const side = typeof value === 'string' && value.trim() !== '' ? Number(value) : value
+  if (!Number.isInteger(side) || side < 1 || side > 4000) {
+    return { error: 'Photo size is not valid' }
+  }
+  return { value: side }
 }
 
 export function firstError(fields) {

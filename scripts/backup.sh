@@ -29,6 +29,13 @@ docker compose cp app:/tmp/backup.db "backups/$name"
 docker compose exec -T app rm -f /tmp/backup.db /tmp/backup.db-wal /tmp/backup.db-shm
 chmod 600 "backups/$name"
 
+mkdir -p backups/photos
+chmod 700 backups/photos
+if docker compose exec -T app test -d /data/photos; then
+  docker compose cp app:/data/photos/. backups/photos/
+  find backups/photos -type f -exec chmod 600 {} +
+fi
+
 ls -1t backups/winter-arc-*.db 2>/dev/null | tail -n +$((keep + 1)) | xargs -r rm --
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') saved backups/$name"
+echo "$(date '+%Y-%m-%d %H:%M:%S') saved backups/$name and backups/photos ($(find backups/photos -type f | wc -l) photos)"

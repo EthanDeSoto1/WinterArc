@@ -67,6 +67,16 @@ export function BoardIcon(props) {
   )
 }
 
+export function PhotoIcon(props) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <circle cx="9" cy="10" r="1.75" />
+      <path d="m21 15.5-4.5-4.5L7 19" />
+    </Icon>
+  )
+}
+
 export function SettingsIcon(props) {
   return (
     <Icon {...props}>

@@ -43,6 +43,29 @@ const migrations = [
   );
   CREATE INDEX post_reactions_user ON post_reactions (user_id);
   `,
+  `
+  ALTER TABLE posts ADD COLUMN photo TEXT;
+  ALTER TABLE posts ADD COLUMN photo_width INTEGER;
+  ALTER TABLE posts ADD COLUMN photo_height INTEGER;
+  CREATE TABLE post_reactions_one (
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('fire', 'muscle', 'clap')),
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (post_id, user_id)
+  );
+  INSERT INTO post_reactions_one (post_id, user_id, kind, created_at)
+    SELECT post_id, user_id, kind, created_at FROM post_reactions AS reaction
+    WHERE rowid = (
+      SELECT rowid FROM post_reactions
+      WHERE post_id = reaction.post_id AND user_id = reaction.user_id
+      ORDER BY created_at DESC, rowid DESC
+      LIMIT 1
+    );
+  DROP TABLE post_reactions;
+  ALTER TABLE post_reactions_one RENAME TO post_reactions;
+  CREATE INDEX post_reactions_user ON post_reactions (user_id);
+  `,
 ]
 
 const currentVersion = db.pragma('user_version', { simple: true })

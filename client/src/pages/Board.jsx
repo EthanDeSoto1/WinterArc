@@ -4,11 +4,10 @@ import { api } from '../api.js'
 import { useAuth } from '../AuthContext.jsx'
 import Page from '../components/Page.jsx'
 import { Avatar } from '../components/PersonRow.jsx'
-import { FormError, PrimaryButton, SmallButton } from '../components/Form.jsx'
+import PostComposer from '../components/PostComposer.jsx'
+import { SmallButton } from '../components/Form.jsx'
 import { EmptyState, ErrorState, LoadingState, Toast } from '../components/States.jsx'
 import { formatShortDate, formatTime } from '../dates.js'
-
-const MAX_LENGTH = 500
 
 const REACTIONS = [
   { kind: 'fire', emoji: '🔥', label: 'Fire' },
@@ -27,72 +26,19 @@ function postedWhen(post, board, timezone) {
   return `${formatShortDate(post.day)} · ${time}`
 }
 
-function toggleReaction(post, kind) {
+function chooseReaction(post, kind) {
   return {
     ...post,
-    reactions: post.reactions.map((reaction) =>
-      reaction.kind === kind
-        ? { ...reaction, mine: !reaction.mine, count: reaction.count + (reaction.mine ? -1 : 1) }
-        : reaction
-    ),
+    reactions: post.reactions.map((reaction) => {
+      if (reaction.kind === kind) {
+        return { ...reaction, mine: !reaction.mine, count: reaction.count + (reaction.mine ? -1 : 1) }
+      }
+      if (reaction.mine) {
+        return { ...reaction, mine: false, count: reaction.count - 1 }
+      }
+      return reaction
+    }),
   }
-}
-
-function Composer({ onPosted }) {
-  const [text, setText] = useState('')
-  const [posting, setPosting] = useState(false)
-  const [error, setError] = useState('')
-  const remaining = MAX_LENGTH - text.length
-
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setError('')
-    setPosting(true)
-    try {
-      const data = await api('/posts', { method: 'POST', body: { body: text } })
-      onPosted(data.post)
-      setText('')
-    } catch (postError) {
-      setError(postError.message)
-    }
-    setPosting(false)
-  }
-
-  function handleKeyDown(event) {
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && text.trim() !== '' && !posting) {
-      handleSubmit(event)
-    }
-  }
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="hud flex flex-col gap-3 rounded-2xl border border-white/[0.06] bg-ink-900/70 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]"
-    >
-      <label htmlFor="post-body" className="sr-only">
-        New post
-      </label>
-      <textarea
-        id="post-body"
-        rows={3}
-        value={text}
-        maxLength={MAX_LENGTH}
-        onChange={(event) => setText(event.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Share a workout, a win, or a rough day…"
-        className="min-h-24 w-full resize-y rounded-xl border border-white/[0.08] bg-ink-900 px-4 py-3 text-base text-ice-50 placeholder:text-steel-500 transition focus:border-ice-400/60 focus:outline-none focus:ring-4 focus:ring-ice-400/10"
-      />
-      <FormError message={error} />
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-steel-500">
-          {remaining <= 100 ? `${remaining} characters left` : 'Only you and your friends see posts.'}
-        </p>
-        <PrimaryButton type="submit" disabled={posting || text.trim() === ''} className="shrink-0">
-          {posting ? 'Posting…' : 'Post'}
-        </PrimaryButton>
-      </div>
-    </form>
-  )
 }
 
 function PostCard({ post, board, timezone, onReact, onDelete, deleting }) {
@@ -117,7 +63,17 @@ function PostCard({ post, board, timezone, onReact, onDelete, deleting }) {
           </SmallButton>
         )}
       </div>
-      <p className="mt-3 text-[15px] leading-relaxed whitespace-pre-wrap break-words text-steel-200">{post.body}</p>
+      {post.body && <p className="mt-3 text-[15px] leading-relaxed whitespace-pre-wrap break-words text-steel-200">{post.body}</p>}
+      {post.photo && (
+        <img
+          src={`/api/posts/${post.id}/photo`}
+          alt={`Photo from ${post.isYours ? 'you' : post.user.displayName}`}
+          width={post.photo.width}
+          height={post.photo.height}
+          loading="lazy"
+          className="mt-3 h-auto max-h-[32rem] w-full rounded-xl border border-white/[0.06] bg-ink-850 object-contain"
+        />
+      )}
       <div className="mt-3 flex flex-wrap gap-2">
         {post.reactions.map((reaction) => {
           const info = REACTIONS.find((item) => item.kind === reaction.kind)
@@ -158,6 +114,7 @@ export default function Board() {
   const [toast, setToast] = useState('')
   const pendingCount = useRef(0)
   const missedSync = useRef(false)
+  const reactionQueue = useRef(Promise.resolve())
 
   function loadBoard(showSpinner) {
     if (showSpinner) {
@@ -240,23 +197,23 @@ export default function Board() {
     setPosts((current) => current.map((post) => (post.id === updated.id ? updated : post)))
   }
 
-  async function handleReact(post, kind) {
+  function handleReact(post, kind) {
     const reaction = post.reactions.find((item) => item.kind === kind)
-    replacePost(toggleReaction(post, kind))
+    replacePost(chooseReaction(post, kind))
     pendingCount.current += 1
-    try {
-      const data = await api(`/posts/${post.id}/reactions/${kind}`, { method: reaction.mine ? 'DELETE' : 'PUT' })
-      if (pendingCount.current === 1) {
-        replacePost(data.post)
-      }
-    } catch (error) {
-      setPosts((current) => current.map((item) => (item.id === post.id ? toggleReaction(item, kind) : item)))
-      setToast(error.status === 0 ? `${error.message} That reaction was not saved.` : error.message)
-      if (error.status === 404) {
+    reactionQueue.current = reactionQueue.current.then(async () => {
+      try {
+        const data = await api(`/posts/${post.id}/reactions/${kind}`, { method: reaction.mine ? 'DELETE' : 'PUT' })
+        if (pendingCount.current === 1) {
+          replacePost(data.post)
+        }
+      } catch (error) {
+        replacePost(post)
         missedSync.current = true
+        setToast(error.status === 0 ? `${error.message} That reaction was not saved.` : error.message)
       }
-    }
-    finishPending()
+      finishPending()
+    })
   }
 
   async function handleDelete(post) {
@@ -283,7 +240,7 @@ export default function Board() {
       {status === 'error' && <ErrorState message={loadError} onRetry={() => loadBoard(true)} />}
       {status === 'ready' && (
         <>
-          <Composer onPosted={handlePosted} />
+          <PostComposer onPosted={handlePosted} />
           {posts.length === 0 && (
             <div className="mt-6">
               <EmptyState title="Nothing posted yet" message="Share a workout, a win, or a tough day. Your friends can react to keep you going.">
