@@ -7,6 +7,7 @@ import authRoutes, { SESSION_COOKIE_NAME } from './auth.js'
 import goalRoutes from './goals.js'
 import friendRoutes from './friends.js'
 import historyRoutes from './history.js'
+import feedRoutes from './feed.js'
 
 const sessionSecret = process.env.SESSION_SECRET || ''
 if (sessionSecret.length < 32) {
@@ -60,6 +61,7 @@ app.use('/api', authRoutes)
 app.use('/api', goalRoutes)
 app.use('/api', friendRoutes)
 app.use('/api', historyRoutes)
+app.use('/api', feedRoutes)
 
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found' })

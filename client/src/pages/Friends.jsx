@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { api } from '../api.js'
 import Page from '../components/Page.jsx'
 import FriendCard from '../components/FriendCard.jsx'
+import ActivityFeed from '../components/ActivityFeed.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../components/States.jsx'
 
 export default function Friends() {
@@ -65,6 +66,7 @@ export default function Friends() {
           ))}
         </div>
       )}
+      {status === 'ready' && <ActivityFeed />}
     </Page>
   )
 }

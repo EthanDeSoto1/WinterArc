@@ -38,3 +38,7 @@ export function isMonday(dateString) {
 export function deviceTimezone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone
 }
+
+export function formatTime(timestamp, timezone) {
+  return new Date(timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: timezone })
+}
