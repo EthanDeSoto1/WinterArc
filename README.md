@@ -2,9 +2,13 @@
 
 Track daily discipline goals with friends from Oct 1 to Jan 1.
 
-The whole app runs in one Docker container on the home server. Only people on your Tailscale network can reach it.
+- Create daily goals, or weekly goals you hit N times a week, and check them off each day.
+- Streaks, a countdown to Jan 1, and a History calendar of the season.
+- Add friends by username and see each other's goals and today's progress.
 
-> This README is filled in stage by stage. Sharing with friends, installing to the home screen and backups come in Stage 6.
+The whole app runs in one Docker container on a home server. It is meant to be reached only over a private [Tailscale](https://tailscale.com) network, never the public internet.
+
+> This README is filled in stage by stage. Sharing with friends, installing to the home screen and backups come later.
 
 ## Project layout
 
@@ -19,7 +23,7 @@ docker-compose.yml   Runs the container
 
 ## 1. First-time setup on the server
 
-Run these on the Linux Mint server, inside the project folder (for example `~/winter-arc`).
+Run these on your Linux server, inside the project folder (for example `~/winter-arc`). You need Docker with the Compose plugin.
 
 1. Create your settings file:
 
@@ -53,7 +57,7 @@ Run these on the Linux Mint server, inside the project folder (for example `~/wi
 
 The database lives in a Docker volume called `winter-arc_winter-arc-data`. It survives restarts, rebuilds and `docker compose down`. **Do not** run `docker compose down -v`, because `-v` deletes the volume and all data.
 
-The app only listens on `127.0.0.1:3000`, so nothing outside the server can reach that port directly. Tailscale provides the outside access in the next step.
+The app only listens on `127.0.0.1:3000` (the server itself), so nothing else can reach that port directly. Tailscale provides the outside access in the next step.
 
 ## 3. HTTPS on your tailnet with `tailscale serve`
 
@@ -109,3 +113,15 @@ cd client && npm install && npm run dev
 ```
 
 Open the address Vite prints. The client dev server passes `/api` requests through to the server on port 3000.
+
+Run the server tests with `cd server && npm test`.
+
+## Keeping this repo safe to share
+
+This repository is public. Never commit:
+
+- `.env` or any real `SESSION_SECRET` or `INVITE_CODE`
+- database files (`*.db`) or backups
+- server names, tailnet addresses, IP addresses, SSH details or users' names and emails
+
+Private notes about a specific deployment belong in `HANDOFF.md`, which is git-ignored and stays on your own computer.
