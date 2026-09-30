@@ -97,6 +97,8 @@ Do **not** use `tailscale funnel`. Funnel puts the app on the public internet. `
 
 `scripts/backup.sh` copies the live database into the `backups/` folder next to `docker-compose.yml`, as a file named like `winter-arc-2026-10-01-033000.db`. It checks that the copy is not damaged, keeps the newest 14 nightly files and deletes older ones. The app keeps running while it works.
 
+It also copies Board photos into `backups/photos/`. That folder is one growing copy of every photo (photo files never change), so it is not pruned.
+
 1. Run it once by hand to check it works:
 
    ```bash
@@ -137,7 +139,7 @@ ls -l backups
 bash scripts/restore.sh backups/winter-arc-2026-10-01-033000.db
 ```
 
-The script first saves the current database as `backups/before-restore-<date>.db` (if the app is running), so you can undo the restore by restoring that file. Then it stops the app, puts the backup in place and starts the app again. Run `docker compose ps` after about 10 seconds and check it shows `(healthy)`.
+The script first saves the current database as `backups/before-restore-<date>.db` (if the app is running), so you can undo the restore by restoring that file. Then it stops the app, puts the backup in place, copies back any photos from `backups/photos/` that are missing, and starts the app again. Run `docker compose ps` after about 10 seconds and check it shows `(healthy)`.
 
 ## 5. Sharing with friends
 
