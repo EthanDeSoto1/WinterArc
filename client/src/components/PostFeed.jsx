@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../api.js'
 import { useAuth } from '../AuthContext.jsx'
@@ -51,16 +51,100 @@ function photoAlt(post) {
   return `Photo from ${post.isYours ? 'you' : post.user.displayName}`
 }
 
-function PhotoViewer({ post, onClose }) {
-  const [dragY, setDragY] = useState(0)
+const OPEN_TRANSITION = 'transform 340ms cubic-bezier(0.2, 0.9, 0.25, 1), opacity 200ms ease'
+const CLOSE_TRANSITION = 'transform 320ms cubic-bezier(0.3, 0.8, 0.25, 1), opacity 240ms ease'
+const SNAP_TRANSITION = 'transform 280ms cubic-bezier(0.2, 0.9, 0.25, 1)'
+const CLOSE_MS = 320
+const FULL_FADE = 0.95
+
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function homeBox(image) {
+  return { x: image.offsetLeft, y: image.offsetTop, width: image.offsetWidth, height: image.offsetHeight }
+}
+
+function photoBox(element, photo) {
+  const box = element.getBoundingClientRect()
+  const ratio = photo.width / photo.height
+  let width = box.width
+  let height = box.height
+  if (width / height > ratio) {
+    width = height * ratio
+  } else {
+    height = width / ratio
+  }
+  return { x: box.left + (box.width - width) / 2, y: box.top + (box.height - height) / 2, width, height }
+}
+
+function flyTo(from, to) {
+  const scale = to.width / from.width
+  const moveX = to.x + to.width / 2 - (from.x + from.width / 2)
+  const moveY = to.y + to.height / 2 - (from.y + from.height / 2)
+  return `translate(${moveX}px, ${moveY}px) scale(${scale})`
+}
+
+function isOnScreen(element) {
+  if (!element || !element.isConnected) {
+    return false
+  }
+  const box = element.getBoundingClientRect()
+  return box.bottom > 0 && box.top < window.innerHeight && box.width > 0
+}
+
+function PhotoViewer({ post, source, onClose }) {
+  const [motion, setMotion] = useState({ transform: 'none', transition: 'none', opacity: 1 })
+  const [fade, setFade] = useState(FULL_FADE)
   const [dragging, setDragging] = useState(false)
+  const imageRef = useRef(null)
   const startY = useRef(null)
+  const dragY = useRef(0)
+  const lastMove = useRef({ y: 0, time: 0, speed: 0 })
   const moved = useRef(false)
+  const closing = useRef(false)
+  const closeRef = useRef(null)
+
+  useLayoutEffect(() => {
+    if (prefersReducedMotion() || !isOnScreen(source)) {
+      return
+    }
+    setMotion({ transform: flyTo(homeBox(imageRef.current), photoBox(source, post.photo)), transition: 'none', opacity: 1 })
+    setFade(0)
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        setMotion({ transform: 'none', transition: OPEN_TRANSITION, opacity: 1 })
+        setFade(FULL_FADE)
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
+  function close(direction = 0) {
+    if (closing.current) {
+      return
+    }
+    closing.current = true
+    if (prefersReducedMotion()) {
+      onClose()
+      return
+    }
+    if (isOnScreen(source)) {
+      setMotion({ transform: flyTo(homeBox(imageRef.current), photoBox(source, post.photo)), transition: CLOSE_TRANSITION, opacity: 1 })
+    } else {
+      const away = direction * window.innerHeight * 0.6
+      setMotion({ transform: `translateY(${away}px) scale(0.9)`, transition: CLOSE_TRANSITION, opacity: 0 })
+    }
+    setDragging(false)
+    setFade(0)
+    setTimeout(onClose, CLOSE_MS)
+  }
+  closeRef.current = close
 
   useEffect(() => {
     function handleKey(event) {
       if (event.key === 'Escape') {
-        onClose()
+        closeRef.current()
       }
     }
     const overflow = document.body.style.overflow
@@ -70,13 +154,15 @@ function PhotoViewer({ post, onClose }) {
       document.body.style.overflow = overflow
       window.removeEventListener('keydown', handleKey)
     }
-  }, [onClose])
+  }, [])
 
   function handlePointerDown(event) {
-    if (event.target.closest('button')) {
+    if (closing.current || event.target.closest('button')) {
       return
     }
     startY.current = event.clientY
+    dragY.current = 0
+    lastMove.current = { y: event.clientY, time: event.timeStamp, speed: 0 }
     moved.current = false
     setDragging(true)
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -87,10 +173,17 @@ function PhotoViewer({ post, onClose }) {
       return
     }
     const distance = event.clientY - startY.current
+    const elapsed = event.timeStamp - lastMove.current.time
+    if (elapsed > 0) {
+      lastMove.current = { y: event.clientY, time: event.timeStamp, speed: (event.clientY - lastMove.current.y) / elapsed }
+    }
     if (Math.abs(distance) > 6) {
       moved.current = true
     }
-    setDragY(distance)
+    dragY.current = distance
+    const shrink = 1 - Math.min(Math.abs(distance) / 1200, 0.12)
+    setMotion({ transform: `translateY(${distance}px) scale(${shrink})`, transition: 'none', opacity: 1 })
+    setFade(FULL_FADE - Math.min(Math.abs(distance) / 500, 0.55))
   }
 
   function handlePointerUp() {
@@ -99,16 +192,19 @@ function PhotoViewer({ post, onClose }) {
     }
     startY.current = null
     setDragging(false)
-    if (Math.abs(dragY) > CLOSE_DISTANCE) {
-      onClose()
+    const distance = dragY.current
+    const flick = Math.abs(lastMove.current.speed) > 0.6 && Math.abs(distance) > 24
+    if (Math.abs(distance) > CLOSE_DISTANCE || flick) {
+      close(Math.sign(distance))
     } else {
-      setDragY(0)
+      setMotion({ transform: 'none', transition: SNAP_TRANSITION, opacity: 1 })
+      setFade(FULL_FADE)
     }
   }
 
   function handleClick() {
     if (!moved.current) {
-      onClose()
+      close()
     }
   }
 
@@ -122,28 +218,31 @@ function PhotoViewer({ post, onClose }) {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      style={{ backgroundColor: `rgb(0 0 0 / ${0.95 - Math.min(Math.abs(dragY) / 400, 0.6)})` }}
-      className={`fixed inset-0 z-30 flex animate-fade-up touch-none items-center justify-center px-2 pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur select-none ${
-        dragging ? '' : 'transition-[background-color] duration-200'
-      }`}
+      style={{
+        backgroundColor: `rgb(0 0 0 / ${fade})`,
+        transition: dragging ? 'none' : `background-color ${CLOSE_MS}ms ease`,
+      }}
+      className="fixed inset-0 z-30 flex touch-none items-center justify-center px-2 pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] select-none"
     >
       <button
         type="button"
-        onClick={onClose}
+        onClick={() => close()}
         autoFocus
         aria-label="Close photo"
-        className="absolute top-[calc(0.5rem+env(safe-area-inset-top))] right-2 flex size-11 items-center justify-center rounded-full bg-white/10 text-ice-50 transition active:bg-white/20 lg:hover:bg-white/20"
+        style={{ opacity: fade / FULL_FADE, transition: dragging ? 'none' : `opacity ${CLOSE_MS}ms ease` }}
+        className="absolute top-[calc(0.5rem+env(safe-area-inset-top))] right-2 flex size-11 items-center justify-center rounded-full bg-white/10 text-ice-50 active:bg-white/20 lg:hover:bg-white/20"
       >
         <CrossIcon className="size-5" />
       </button>
       <img
+        ref={imageRef}
         src={`/api/posts/${post.id}/photo?v=${post.photo.version}`}
         alt={photoAlt(post)}
         width={post.photo.width}
         height={post.photo.height}
         draggable={false}
-        style={{ transform: `translateY(${dragY}px)` }}
-        className={`h-auto max-h-full w-auto max-w-full object-contain ${dragging ? '' : 'transition-transform duration-200'}`}
+        style={motion}
+        className="h-auto max-h-full w-auto max-w-full rounded-2xl object-contain will-change-transform"
       />
     </div>
   )
@@ -202,7 +301,7 @@ function PostEditor({ post, onSaved, onCancel }) {
   )
 }
 
-function PostCard({ post, board, me, timezone, onReact, onDelete, onChange, onError, onOpenPhoto, deleting }) {
+function PostCard({ post, board, me, timezone, onReact, onDelete, onChange, onError, onOpenPhoto, viewing, deleting }) {
   const [editing, setEditing] = useState(false)
   return (
     <li className="rounded-2xl border border-white/[0.06] bg-ink-900/70 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)] transition lg:hover:border-ice-300/30 lg:hover:shadow-[0_0_28px_-12px_rgb(174_219_255/0.5)]">
@@ -252,7 +351,7 @@ function PostCard({ post, board, me, timezone, onReact, onDelete, onChange, onEr
       {post.photo && (
         <button
           type="button"
-          onClick={() => onOpenPhoto(post.id)}
+          onClick={(event) => onOpenPhoto(post.id, event.currentTarget.querySelector('img'))}
           aria-label={`${photoAlt(post)}, open full screen`}
           className="mt-3 block w-full cursor-zoom-in rounded-xl transition active:opacity-80"
         >
@@ -262,7 +361,7 @@ function PostCard({ post, board, me, timezone, onReact, onDelete, onChange, onEr
             width={post.photo.width}
             height={post.photo.height}
             loading="lazy"
-            className="h-auto max-h-[32rem] w-full rounded-xl border border-white/[0.06] bg-ink-850 object-contain"
+            className={`h-auto max-h-[32rem] w-full rounded-xl border border-white/[0.06] bg-ink-850 object-contain ${viewing ? 'opacity-0' : ''}`}
           />
         </button>
       )}
@@ -319,6 +418,7 @@ export default function PostFeed({ userId = null, showComposer = false, emptySta
   const [deletingId, setDeletingId] = useState(null)
   const [toast, setToast] = useState('')
   const [viewingId, setViewingId] = useState(null)
+  const photoSource = useRef(null)
   const pendingCount = useRef(0)
   const missedSync = useRef(false)
   const reactionQueue = useRef(Promise.resolve())
@@ -443,6 +543,11 @@ export default function PostFeed({ userId = null, showComposer = false, emptySta
 
   const viewingPost = posts.find((post) => post.id === viewingId && post.photo)
 
+  function openPhoto(postId, element) {
+    photoSource.current = element
+    setViewingId(postId)
+  }
+
   function closePhoto() {
     setViewingId(null)
   }
@@ -472,7 +577,8 @@ export default function PostFeed({ userId = null, showComposer = false, emptySta
                   onDelete={handleDelete}
                   onChange={replacePost}
                   onError={setToast}
-                  onOpenPhoto={setViewingId}
+                  onOpenPhoto={openPhoto}
+                  viewing={viewingId === post.id}
                   deleting={deletingId === post.id}
                 />
               ))}
@@ -485,7 +591,7 @@ export default function PostFeed({ userId = null, showComposer = false, emptySta
           )}
         </>
       )}
-      {viewingPost && <PhotoViewer post={viewingPost} onClose={closePhoto} />}
+      {viewingPost && <PhotoViewer post={viewingPost} source={photoSource.current} onClose={closePhoto} />}
       <Toast message={toast} />
     </>
   )
