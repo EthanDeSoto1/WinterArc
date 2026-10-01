@@ -86,17 +86,38 @@ const saveReaction = db.prepare(`
     WHERE kind <> excluded.kind
 `)
 const hasUnreadPosts = db.prepare(`
+  WITH visible AS (
+    SELECT ? AS id
+    UNION
+    SELECT addressee_id FROM friendships WHERE requester_id = ? AND status = 'accepted'
+    UNION
+    SELECT requester_id FROM friendships WHERE addressee_id = ? AND status = 'accepted'
+  )
   SELECT EXISTS (
     SELECT 1 FROM posts
-    WHERE id > ? AND user_id IN (
-        SELECT addressee_id FROM friendships WHERE requester_id = ? AND status = 'accepted'
-        UNION
-        SELECT requester_id FROM friendships WHERE addressee_id = ? AND status = 'accepted'
-      )
+    WHERE id > ? AND user_id <> ? AND user_id IN (SELECT id FROM visible)
+  ) OR EXISTS (
+    SELECT 1 FROM post_comments
+    JOIN posts ON posts.id = post_comments.post_id
+    WHERE post_comments.id > ? AND post_comments.user_id <> ? AND posts.user_id IN (SELECT id FROM visible)
   ) AS unread
+`)
+const findLatestCommentId = db.prepare(`
+  SELECT coalesce(max(post_comments.id), 0) AS id
+  FROM post_comments
+  JOIN posts ON posts.id = post_comments.post_id
+  WHERE posts.user_id = ?
+    OR posts.user_id IN (
+      SELECT addressee_id FROM friendships WHERE requester_id = ? AND status = 'accepted'
+      UNION
+      SELECT requester_id FROM friendships WHERE addressee_id = ? AND status = 'accepted'
+    )
 `)
 const markBoardSeen = db.prepare(
   'UPDATE users SET board_seen_post_id = ? WHERE id = ? AND board_seen_post_id < ? AND ? <= (SELECT coalesce(max(id), 0) FROM posts)'
+)
+const markCommentsSeen = db.prepare(
+  'UPDATE users SET board_seen_comment_id = ? WHERE id = ? AND board_seen_comment_id < ? AND ? <= (SELECT coalesce(max(id), 0) FROM post_comments)'
 )
 const findMyReaction = db.prepare('SELECT kind FROM post_reactions WHERE post_id = ? AND user_id = ?')
 const deleteReaction = db.prepare('DELETE FROM post_reactions WHERE post_id = ? AND user_id = ? AND kind = ?')
@@ -186,20 +207,26 @@ router.get('/posts', requireAuth, (req, res) => {
     yesterday: addDays(today, -1),
     posts: postsToJson(rows.slice(0, PAGE_SIZE), req.user),
     hasMore: rows.length > PAGE_SIZE,
+    latestCommentId: findLatestCommentId.get(req.user.id, req.user.id, req.user.id).id,
   })
 })
 
 router.get('/posts/unread', requireAuth, (req, res) => {
-  res.json({ unread: hasUnreadPosts.get(req.user.board_seen_post_id, req.user.id, req.user.id).unread === 1 })
+  const me = req.user
+  const unread = hasUnreadPosts.get(me.id, me.id, me.id, me.board_seen_post_id, me.id, me.board_seen_comment_id, me.id).unread
+  res.json({ unread: unread === 1 })
 })
 
 router.post('/posts/seen', requireAuth, (req, res) => {
   const postId = readId(req.body.postId, 'post')
-  if (postId.error) {
-    return res.status(400).json({ error: postId.error })
+  const commentId = req.body.commentId === undefined ? { value: 0 } : readId(req.body.commentId, 'comment')
+  const error = firstError([postId, commentId])
+  if (error) {
+    return res.status(400).json({ error })
   }
-  const result = markBoardSeen.run(postId.value, req.user.id, postId.value, postId.value)
-  if (result.changes === 1) {
+  const posts = markBoardSeen.run(postId.value, req.user.id, postId.value, postId.value)
+  const comments = markCommentsSeen.run(commentId.value, req.user.id, commentId.value, commentId.value)
+  if (posts.changes + comments.changes > 0) {
     notifyBoardSeen(req.user.id)
   }
   res.status(204).end()

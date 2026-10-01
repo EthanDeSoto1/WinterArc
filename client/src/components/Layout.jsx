@@ -38,7 +38,7 @@ function UnreadDot({ className = '' }) {
 }
 
 function tabLabel(tab, boardUnread) {
-  return tab.to === '/board' && boardUnread ? `${tab.label}, new posts` : undefined
+  return tab.to === '/board' && boardUnread ? `${tab.label}, new posts or comments` : undefined
 }
 
 function useIsDesktop() {

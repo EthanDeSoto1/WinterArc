@@ -147,6 +147,10 @@ const migrations = [
   ALTER TABLE users ADD COLUMN notify_weekly_recap INTEGER NOT NULL DEFAULT 1;
   ALTER TABLE users ADD COLUMN wrapped_seen INTEGER NOT NULL DEFAULT 0;
   `,
+  `
+  ALTER TABLE users ADD COLUMN board_seen_comment_id INTEGER NOT NULL DEFAULT 0;
+  UPDATE users SET board_seen_comment_id = (SELECT coalesce(max(id), 0) FROM post_comments);
+  `,
 ]
 
 const currentVersion = db.pragma('user_version', { simple: true })

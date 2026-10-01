@@ -449,7 +449,8 @@ export default function PostFeed({ userId = null, showComposer = false, emptySta
         }
         setStatus('ready')
         if (!filter && result.posts.length > 0 && document.visibilityState === 'visible') {
-          api('/posts/seen', { method: 'POST', body: { postId: result.posts[0].id } }).catch(() => {})
+          const seen = result.latestCommentId > 0 ? { postId: result.posts[0].id, commentId: result.latestCommentId } : { postId: result.posts[0].id }
+          api('/posts/seen', { method: 'POST', body: seen }).catch(() => {})
         }
       })
       .catch((error) => {

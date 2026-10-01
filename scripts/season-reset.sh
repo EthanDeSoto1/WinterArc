@@ -23,7 +23,7 @@ const counts = db.transaction(() => {
   const completions = db.prepare("DELETE FROM completions").run().changes;
   const posts = db.prepare("DELETE FROM posts").run().changes;
   db.prepare("DELETE FROM sent_notifications").run();
-  db.prepare("UPDATE users SET board_seen_post_id = 0, created_at = strftime(?, ?)").run("%Y-%m-%dT%H:%M:%fZ", "now");
+  db.prepare("UPDATE users SET board_seen_post_id = 0, board_seen_comment_id = 0, created_at = strftime(?, ?)").run("%Y-%m-%dT%H:%M:%fZ", "now");
   return { goals, completions, posts };
 })();
 let photos = 0;
