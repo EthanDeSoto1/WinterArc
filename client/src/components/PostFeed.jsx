@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { api } from '../api.js'
 import { useAuth } from '../AuthContext.jsx'
@@ -208,7 +209,7 @@ function PhotoViewer({ post, source, onClose }) {
     }
   }
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -244,7 +245,8 @@ function PhotoViewer({ post, source, onClose }) {
         style={motion}
         className="h-auto max-h-full w-auto max-w-full rounded-2xl object-contain will-change-transform"
       />
-    </div>
+    </div>,
+    document.body,
   )
 }
 
