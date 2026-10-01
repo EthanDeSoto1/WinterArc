@@ -5,15 +5,30 @@ export default function GoalForm({ initialGoal, submitLabel, onSubmit, onCancel 
   const [title, setTitle] = useState(initialGoal ? initialGoal.title : '')
   const [frequency, setFrequency] = useState(initialGoal ? initialGoal.frequency : 'daily')
   const [timesPerWeek, setTimesPerWeek] = useState((initialGoal && initialGoal.timesPerWeek) || 3)
+  const [tracking, setTracking] = useState(initialGoal && initialGoal.target !== null ? 'amount' : 'check')
+  const [target, setTarget] = useState(initialGoal && initialGoal.target !== null ? String(initialGoal.target) : '')
+  const [unit, setUnit] = useState(initialGoal && initialGoal.unit ? initialGoal.unit : '')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    const isAmount = tracking === 'amount'
+    const targetNumber = Number(target)
+    if (isAmount && (target.trim() === '' || !Number.isFinite(targetNumber) || targetNumber <= 0)) {
+      setError('Enter a target above 0')
+      return
+    }
     setSubmitting(true)
     try {
-      await onSubmit({ title, frequency, timesPerWeek: frequency === 'weekly' ? timesPerWeek : null })
+      await onSubmit({
+        title,
+        frequency,
+        timesPerWeek: frequency === 'weekly' && !isAmount ? timesPerWeek : null,
+        target: isAmount ? targetNumber : null,
+        unit: isAmount ? unit : null,
+      })
     } catch (submitError) {
       setError(submitError.message)
       setSubmitting(false)
@@ -43,11 +58,50 @@ export default function GoalForm({ initialGoal, submitLabel, onSubmit, onCancel 
           onChange={setFrequency}
           options={[
             { value: 'daily', label: 'Every day' },
-            { value: 'weekly', label: 'Times per week' },
+            { value: 'weekly', label: tracking === 'amount' ? 'Per week' : 'Times per week' },
           ]}
         />
       </div>
-      {frequency === 'weekly' && (
+      <div className="flex flex-col gap-2">
+        <p className="text-[13px] font-medium text-steel-300">Track it by</p>
+        <Segmented
+          label="Track it by"
+          value={tracking}
+          onChange={setTracking}
+          options={[
+            { value: 'check', label: 'Check off' },
+            { value: 'amount', label: 'Amount' },
+          ]}
+        />
+      </div>
+      {tracking === 'amount' && (
+        <div className="grid grid-cols-2 gap-3">
+          <TextField
+            label={frequency === 'weekly' ? 'Target per week' : 'Target per day'}
+            id={`goal-target-${initialGoal ? initialGoal.id : 'new'}`}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="any"
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+            placeholder={frequency === 'weekly' ? '20' : '8'}
+            required
+          />
+          <TextField
+            label="Unit"
+            id={`goal-unit-${initialGoal ? initialGoal.id : 'new'}`}
+            value={unit}
+            onChange={(event) => setUnit(event.target.value)}
+            placeholder={frequency === 'weekly' ? 'miles' : 'glasses'}
+            maxLength={16}
+          />
+        </div>
+      )}
+      {tracking === 'amount' && frequency === 'weekly' && (
+        <p className="-mt-2 text-xs text-steel-500">Log any day; the week counts once the total reaches the target. Weeks run Monday to Sunday.</p>
+      )}
+      {frequency === 'weekly' && tracking === 'check' && (
         <div className="flex flex-col gap-2">
           <p className="text-[13px] font-medium text-steel-300">Times per week</p>
           <div

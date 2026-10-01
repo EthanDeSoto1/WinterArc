@@ -4,7 +4,8 @@ import { Link } from 'react-router'
 import { api } from '../api.js'
 import { useAuth } from '../AuthContext.jsx'
 import Page from '../components/Page.jsx'
-import GoalRow from '../components/GoalRow.jsx'
+import GoalRow, { AmountGoalRow, shownAmount } from '../components/GoalRow.jsx'
+import MilestoneCelebration from '../components/Milestone.jsx'
 import ProgressRing from '../components/ProgressRing.jsx'
 import { Segmented } from '../components/Form.jsx'
 import { PencilIcon } from '../components/Icons.jsx'
@@ -15,7 +16,7 @@ function isGoalDone(goal, field) {
   return goal[field] || (goal.frequency === 'weekly' && goal.weekCount >= goal.timesPerWeek)
 }
 
-function GoalSection({ label, goals, field, finished, onToggle }) {
+function GoalSection({ label, goals, field, day, finished, onToggle, onAmount }) {
   if (goals.length === 0) {
     return null
   }
@@ -28,9 +29,20 @@ function GoalSection({ label, goals, field, finished, onToggle }) {
         {label}
       </h2>
       <div className="flex flex-col gap-2.5">
-        {goals.map((goal) => (
-          <GoalRow key={goal.id} goal={goal} done={goal[field]} finished={finished} onToggle={onToggle} />
-        ))}
+        {goals.map((goal) =>
+          goal.target !== null ? (
+            <AmountGoalRow
+              key={goal.id}
+              goal={goal}
+              day={day}
+              done={isGoalDone(goal, field)}
+              finished={finished}
+              onChange={onAmount}
+            />
+          ) : (
+            <GoalRow key={goal.id} goal={goal} done={goal[field]} finished={finished} onToggle={onToggle} />
+          ),
+        )}
       </div>
     </section>
   )
@@ -77,7 +89,10 @@ export default function Today() {
   const [pendingIds, setPendingIds] = useState([])
   const [holdIds, setHoldIds] = useState([])
   const [toast, setToast] = useState('')
+  const [celebration, setCelebration] = useState(null)
   const pendingCount = useRef(0)
+  const amountQueues = useRef({})
+  const amountSeq = useRef({})
   const missedSync = useRef(false)
   const latestData = useRef(null)
   latestData.current = data
@@ -186,6 +201,7 @@ export default function Today() {
     try {
       const result = await api(`/goals/${goal.id}/complete`, { method: nowDone ? 'POST' : 'DELETE', body: { date } })
       replaceGoal(result.goal)
+      celebrate(result, goal)
     } catch (error) {
       replaceGoal(goal)
       setToast(error.status === 0 ? `${error.message} That change was not saved.` : error.message)
@@ -196,6 +212,64 @@ export default function Today() {
     setPendingIds((ids) => ids.filter((id) => id !== goal.id))
     pendingCount.current--
     if (pendingCount.current === 0 && missedSync.current) {
+      missedSync.current = false
+      loadGoals(false)
+    }
+  }
+
+  function celebrate(result, goal) {
+    if (result.milestone) {
+      setCelebration({ streak: result.milestone, frequency: goal.frequency, title: goal.title })
+    }
+  }
+
+  async function changeAmount(goal, total) {
+    const field = day === 'today' ? 'doneToday' : 'doneYesterday'
+    const date = day === 'today' ? data.today : data.yesterday
+    const dayField = day === 'today' ? 'amountToday' : 'amountYesterday'
+    const shown = shownAmount(goal, day)
+    const dayAmount = Math.max(0, Math.round((total - (shown - goal[dayField])) * 100) / 100)
+    const newShown = Math.round((shown - goal[dayField] + dayAmount) * 100) / 100
+
+    const optimisticGoal = { ...goal, [dayField]: dayAmount }
+    if (goal.frequency === 'daily') {
+      optimisticGoal[field] = dayAmount >= goal.target
+    } else {
+      const sameWeek = !isMonday(data.today)
+      if (day === 'today' || sameWeek) {
+        optimisticGoal.weekAmount = newShown
+        optimisticGoal.weekCount = newShown >= goal.target ? 1 : 0
+      }
+      if (day === 'yesterday' || sameWeek) {
+        optimisticGoal.weekAmountYesterday = newShown
+      }
+    }
+    if (isGoalDone(optimisticGoal, field) !== isGoalDone(goal, field)) {
+      setHoldIds((ids) => [...ids, goal.id])
+      setTimeout(() => releaseHold(goal.id), 600)
+    }
+    replaceGoal(optimisticGoal)
+
+    const seq = (amountSeq.current[goal.id] || 0) + 1
+    amountSeq.current[goal.id] = seq
+    pendingCount.current++
+    const previous = amountQueues.current[goal.id] || Promise.resolve()
+    const request = previous.then(() => api(`/goals/${goal.id}/amount`, { method: 'PUT', body: { date, amount: dayAmount } }))
+    amountQueues.current[goal.id] = request.catch(() => {})
+
+    let failed = false
+    try {
+      const result = await request
+      if (amountSeq.current[goal.id] === seq) {
+        replaceGoal(result.goal)
+      }
+      celebrate(result, goal)
+    } catch (error) {
+      failed = true
+      setToast(error.status === 0 ? `${error.message} That change was not saved.` : error.message)
+    }
+    pendingCount.current--
+    if (failed || (pendingCount.current === 0 && missedSync.current)) {
       missedSync.current = false
       loadGoals(false)
     }
@@ -303,20 +377,25 @@ export default function Today() {
                 label="Daily"
                 goals={openGoals.filter((goal) => goal.frequency === 'daily')}
                 field={field}
+                day={day}
                 onToggle={toggleGoal}
+                onAmount={changeAmount}
               />
               <GoalSection
                 label="Weekly"
                 goals={openGoals.filter((goal) => goal.frequency === 'weekly')}
                 field={field}
+                day={day}
                 onToggle={toggleGoal}
+                onAmount={changeAmount}
               />
-              <GoalSection label="Done" goals={finishedGoals} field={field} finished onToggle={toggleGoal} />
+              <GoalSection label="Done" goals={finishedGoals} field={field} day={day} finished onToggle={toggleGoal} onAmount={changeAmount} />
             </>
           )}
         </div>
       </div>
       <Toast message={toast} />
+      <MilestoneCelebration celebration={celebration} onClose={() => setCelebration(null)} />
     </Page>
   )
 }

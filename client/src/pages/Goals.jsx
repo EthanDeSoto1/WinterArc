@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { api } from '../api.js'
 import Page from '../components/Page.jsx'
 import GoalForm from '../components/GoalForm.jsx'
+import { formatAmount } from '../components/GoalRow.jsx'
 import { SectionTitle } from '../components/PersonRow.jsx'
 import { FormError, PrimaryButton, SecondaryButton, SmallButton } from '../components/Form.jsx'
 import { ArchiveIcon, ArrowDownIcon, ArrowUpIcon, PencilIcon, PlusIcon, ReorderIcon } from '../components/Icons.jsx'
@@ -14,6 +15,9 @@ const GROUPS = [
 ]
 
 function describeFrequency(goal) {
+  if (goal.target !== null) {
+    return `${formatAmount(goal.target)}${goal.unit ? ` ${goal.unit}` : ''} ${goal.frequency === 'daily' ? 'a day' : 'per week'}`
+  }
   return goal.frequency === 'daily' ? 'Every day' : `${goal.timesPerWeek}× per week`
 }
 

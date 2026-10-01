@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { api } from '../api.js'
 import { useAuth } from '../AuthContext.jsx'
 import Page from '../components/Page.jsx'
@@ -7,6 +7,7 @@ import ManageFriends from '../components/ManageFriends.jsx'
 import AvatarColorPicker from '../components/AvatarColorPicker.jsx'
 import ChangePassword from '../components/ChangePassword.jsx'
 import NotificationSettings from '../components/NotificationSettings.jsx'
+import AdminPanel from '../components/AdminPanel.jsx'
 import { FormError, PrimaryButton, SelectField, TextField } from '../components/Form.jsx'
 import { deviceTimezone } from '../dates.js'
 import { turnOffPush } from '../push.js'
@@ -59,7 +60,18 @@ export default function Account() {
   }
 
   return (
-    <Page eyebrow={`@${user.username}`} title="Account">
+    <Page
+      eyebrow={`@${user.username}`}
+      title="Account"
+      action={
+        <Link
+          to={`/people/${user.id}`}
+          className="flex min-h-11 shrink-0 items-center rounded-full border border-white/10 px-4 text-sm font-medium text-steel-200 transition active:bg-white/5 lg:hover:border-ice-300/30 lg:hover:text-ice-50"
+        >
+          My profile
+        </Link>
+      }
+    >
       <form
         onSubmit={handleSave}
         className="flex flex-col gap-5 rounded-2xl border border-white/[0.06] bg-ink-900/70 p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]"
@@ -123,6 +135,8 @@ export default function Account() {
       <ChangePassword />
 
       <ManageFriends />
+
+      {user.isAdmin && <AdminPanel />}
 
       <button
         type="button"

@@ -100,6 +100,44 @@ export function readTimesPerWeek(frequency, value) {
   return { value }
 }
 
+function roundAmount(value) {
+  return Math.round(value * 100) / 100
+}
+
+export function readGoalTarget(value) {
+  if (value === undefined || value === null) {
+    return { value: null }
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > 100000) {
+    return { error: 'The target must be a number above 0' }
+  }
+  return { value: roundAmount(value) }
+}
+
+export function readUnit(value, target) {
+  if (target === null) {
+    return { value: null }
+  }
+  if (value === undefined || value === null) {
+    return { value: '' }
+  }
+  if (typeof value !== 'string') {
+    return { error: 'The unit must be text' }
+  }
+  const unit = value.trim().replace(/\s+/g, ' ')
+  if (unit.length > 16) {
+    return { error: 'The unit must be 16 characters or fewer' }
+  }
+  return { value: unit }
+}
+
+export function readAmount(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100000) {
+    return { error: 'The amount must be a number from 0 up' }
+  }
+  return { value: roundAmount(value) }
+}
+
 export function readSearchQuery(value) {
   if (typeof value !== 'string') {
     return { value: '' }

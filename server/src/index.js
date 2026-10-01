@@ -11,6 +11,7 @@ import feedRoutes from './feed.js'
 import postRoutes from './posts.js'
 import eventRoutes, { closeAllStreams } from './events.js'
 import pushRoutes from './push.js'
+import adminRoutes from './admin.js'
 import { startReminders } from './reminders.js'
 
 const sessionSecret = process.env.SESSION_SECRET || ''
@@ -69,6 +70,7 @@ app.use('/api', feedRoutes)
 app.use('/api', postRoutes)
 app.use('/api', eventRoutes)
 app.use('/api', pushRoutes)
+app.use('/api', adminRoutes)
 
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found' })

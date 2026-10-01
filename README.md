@@ -42,7 +42,15 @@ Run these on your Linux server, inside the project folder (for example `~/winter
 
 3. Open `.env` with `nano .env` and set `INVITE_CODE` to a word only your friends will know. Leave it empty to let anyone on your tailnet sign up. Save with Ctrl+O, Enter, then exit with Ctrl+X.
 
-4. Notifications (optional). After the first `docker compose up -d --build` (section 2), create the notification keys once, then restart:
+4. Admin (optional). To get the **Admin** section in Account, add your own username:
+
+   ```bash
+   echo "ADMIN_USERNAME=<your username>" >> .env
+   ```
+
+   Only that one account sees it. Restart the app afterwards (`docker compose up -d`).
+
+5. Notifications (optional). After the first `docker compose up -d --build` (section 2), create the notification keys once, then restart:
 
    ```bash
    docker compose run --rm --no-deps -T app node -e "const k = require('web-push').generateVAPIDKeys(); console.log('VAPID_PUBLIC_KEY=' + k.publicKey); console.log('VAPID_PRIVATE_KEY=' + k.privateKey)" >> .env
@@ -162,6 +170,12 @@ bash scripts/reset-password.sh <username>
 
 It prints a temporary password, signs that person out on every device and turns off their notifications (they turn them on again in Account). Send them the temporary password privately and ask them to change it in **Account → Password**.
 
+If you set `ADMIN_USERNAME`, you can do the same from your phone: **Account → Admin → Reset password** next to their name shows the temporary password.
+
+### The Admin section
+
+Only the account named in `ADMIN_USERNAME` sees it, at the bottom of **Account**. It lists everyone on the app, resets passwords (see above) and changes the **invite code**. A code saved there replaces `INVITE_CODE` from `.env` straight away, and the old code stops working.
+
 ## 5. Sharing with friends
 
 Friends reach the app through **Tailscale machine sharing**. They get access to this one server, not to the rest of your tailnet.
@@ -174,7 +188,7 @@ Friends reach the app through **Tailscale machine sharing**. They get access to 
    2. Opens the invite link and accepts it with the same account.
    3. Turns Tailscale on in the app.
    4. Opens `https://<machine-name>.<tailnet>.ts.net` in their phone's browser.
-5. Give them the invite code from your `.env` so they can sign up.
+5. Give them the invite code (from your `.env`, or the one you set in **Account → Admin**) so they can sign up.
 
 Tailscale must be switched on whenever they use the app. Without it, the app shows a "Could not reach Winter Arc" screen.
 

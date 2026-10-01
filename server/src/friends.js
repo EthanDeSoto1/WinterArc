@@ -4,11 +4,25 @@ import { requireAuth } from './auth.js'
 import { readId, readSearchQuery, readUsername } from './validation.js'
 import { goalsWithStatus, isFinishedToday } from './goals.js'
 import { notifyFriendship } from './events.js'
-import { notifyFriendRequest, notifyRequestAccepted } from './push.js'
+import { notifyFriendRequest, notifyRequestAccepted, notifyNudge, markSentOnce } from './push.js'
+import { seasonRange, longestDailyRun } from './dates.js'
 
 const SEARCH_LIMIT = 20
 
 const findUserById = db.prepare('SELECT id, username, display_name, avatar_color FROM users WHERE id = ?')
+const findFullUser = db.prepare('SELECT * FROM users WHERE id = ?')
+const findSentNudge = db.prepare('SELECT 1 FROM sent_notifications WHERE user_id = ? AND kind = ? AND day = ?')
+const findMilestones = db.prepare(`
+  SELECT milestones.id, milestones.streak, milestones.reached_on, goals.id AS goal_id, goals.title, goals.frequency
+  FROM milestones JOIN goals ON goals.id = milestones.goal_id
+  WHERE milestones.user_id = ?
+  ORDER BY milestones.reached_on DESC, milestones.streak DESC
+`)
+const findSeasonCompletions = db.prepare(`
+  SELECT completions.goal_id, completions.completed_on, goals.frequency
+  FROM completions JOIN goals ON goals.id = completions.goal_id
+  WHERE completions.user_id = ? AND completions.completed_on BETWEEN ? AND ?
+`)
 const findUserWithTimezone = db.prepare('SELECT id, username, display_name, avatar_color, timezone FROM users WHERE id = ?')
 const findUserByUsername = db.prepare('SELECT id, username, display_name, avatar_color FROM users WHERE username = ?')
 const searchUsers = db.prepare(`
@@ -75,15 +89,34 @@ function friendGoalToJson(goal) {
     doneToday: goal.doneToday,
     weekCount: goal.weekCount,
     streak: goal.streak,
+    target: goal.target,
+    unit: goal.unit,
+    amountToday: goal.amountToday,
+    weekAmount: goal.weekAmount,
   }
 }
 
-function friendWithToday(friend) {
-  const { goals } = goalsWithStatus(friend)
+function friendWithToday(friend, viewerId) {
+  const { today, goals } = goalsWithStatus(friend)
   return {
     ...publicUser(friend),
     today: { done: goals.filter(isFinishedToday).length, total: goals.length },
+    nudged: findSentNudge.get(friend.id, `nudge-${viewerId}`, today) !== undefined,
   }
+}
+
+function seasonStats(user, today) {
+  const season = seasonRange(today)
+  const rows = findSeasonCompletions.all(user.id, season.start, season.end)
+  const datesByGoal = new Map()
+  for (const row of rows.filter((item) => item.frequency === 'daily')) {
+    datesByGoal.set(row.goal_id, [...(datesByGoal.get(row.goal_id) || []), row.completed_on])
+  }
+  let bestStreak = 0
+  for (const dates of datesByGoal.values()) {
+    bestStreak = Math.max(bestStreak, longestDailyRun(dates, season.start, season.end))
+  }
+  return { checkoffs: rows.length, bestStreak }
 }
 
 function userWithFriendship(user, viewerId) {
@@ -147,7 +180,7 @@ router.get('/users/search', requireAuth, (req, res) => {
 })
 
 router.get('/friends', requireAuth, (req, res) => {
-  res.json({ friends: findFriends.all(req.user.id, req.user.id).map(friendWithToday) })
+  res.json({ friends: findFriends.all(req.user.id, req.user.id).map((friend) => friendWithToday(friend, req.user.id)) })
 })
 
 router.get('/friends/:userId/goals', requireAuth, (req, res) => {
@@ -161,6 +194,53 @@ router.get('/friends/:userId/goals', requireAuth, (req, res) => {
   const friend = findUserWithTimezone.get(friendId.value)
   const { today, goals } = goalsWithStatus(friend)
   res.json({ user: publicUser(friend), today, goals: goals.map(friendGoalToJson) })
+})
+
+router.post('/friends/:userId/nudge', requireAuth, (req, res) => {
+  const friendId = readId(req.params.userId, 'user')
+  if (friendId.error) {
+    return res.status(400).json({ error: friendId.error })
+  }
+  if (!areFriends(req.user.id, friendId.value)) {
+    return res.status(403).json({ error: 'You can only nudge your friends' })
+  }
+  const friend = findFullUser.get(friendId.value)
+  const { today, goals } = goalsWithStatus(friend)
+  const left = goals.filter((goal) => !isFinishedToday(goal))
+  if (left.length === 0) {
+    return res.status(409).json({ error: goals.length === 0 ? 'They don’t have any goals yet' : 'They’re already done for today' })
+  }
+  if (!markSentOnce(friend.id, `nudge-${req.user.id}`, today)) {
+    return res.status(409).json({ error: 'You already nudged them today' })
+  }
+  notifyNudge(req.user, friend, left)
+  res.status(201).json({ nudged: true })
+})
+
+router.get('/people/:userId', requireAuth, (req, res) => {
+  const personId = readId(req.params.userId, 'user')
+  if (personId.error) {
+    return res.status(400).json({ error: personId.error })
+  }
+  const isYou = personId.value === req.user.id
+  if (!isYou && !areFriends(req.user.id, personId.value)) {
+    return res.status(403).json({ error: 'You can only see profiles of your friends' })
+  }
+  const person = findFullUser.get(personId.value)
+  const { today, goals } = goalsWithStatus(person)
+  res.json({
+    user: publicUser(person),
+    isYou,
+    today: { done: goals.filter(isFinishedToday).length, total: goals.length },
+    goals: goals.map(friendGoalToJson),
+    milestones: findMilestones.all(person.id).map((row) => ({
+      id: row.id,
+      streak: row.streak,
+      reachedOn: row.reached_on,
+      goal: { id: row.goal_id, title: row.title, frequency: row.frequency },
+    })),
+    stats: seasonStats(person, today),
+  })
 })
 
 router.get('/friends/requests', requireAuth, (req, res) => {

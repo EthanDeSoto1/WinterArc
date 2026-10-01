@@ -19,6 +19,24 @@ const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', PASSWORD_ROUNDS)
 
 const findUserById = db.prepare('SELECT * FROM users WHERE id = ?')
 const markIntroSeen = db.prepare('UPDATE users SET intro_seen = 1 WHERE id = ?')
+const markWrappedSeen = db.prepare('UPDATE users SET wrapped_seen = 1 WHERE id = ?')
+const findSetting = db.prepare('SELECT value FROM app_settings WHERE key = ?')
+
+export function currentInviteCode() {
+  const saved = findSetting.get('invite_code')
+  return saved ? saved.value : process.env.INVITE_CODE || ''
+}
+
+export function isAdmin(user) {
+  const adminUsername = (process.env.ADMIN_USERNAME || '').trim().toLowerCase()
+  return adminUsername !== '' && user.username === adminUsername
+}
+
+export function wrappedAvailable(user) {
+  const today = todayInTimezone(user.timezone)
+  const season = seasonRange(today)
+  return today > season.end && user.created_at.slice(0, 10) <= season.end
+}
 const findUserByUsername = db.prepare('SELECT * FROM users WHERE username = ?')
 const findUserByEmail = db.prepare('SELECT id FROM users WHERE email = ?')
 const insertUser = db.prepare(`
@@ -82,6 +100,9 @@ export function userToJson(user) {
     avatarColor: user.avatar_color,
     createdAt: user.created_at,
     showIntro: shouldShowIntro(user),
+    showWrapped: user.wrapped_seen === 0 && wrappedAvailable(user),
+    wrappedAvailable: wrappedAvailable(user),
+    isAdmin: isAdmin(user),
   }
 }
 
@@ -123,7 +144,7 @@ router.post('/signup', signupLimiter, async (req, res) => {
     return res.status(400).json({ error })
   }
 
-  const requiredInviteCode = process.env.INVITE_CODE || ''
+  const requiredInviteCode = currentInviteCode()
   const givenInviteCode = typeof req.body.inviteCode === 'string' ? req.body.inviteCode.trim() : ''
   if (requiredInviteCode && givenInviteCode !== requiredInviteCode) {
     return res.status(403).json({ error: 'That invite code is not valid' })
@@ -205,6 +226,11 @@ router.patch('/me', requireAuth, (req, res) => {
 
 router.post('/me/intro', requireAuth, (req, res) => {
   markIntroSeen.run(req.user.id)
+  res.json({ user: userToJson(findUserById.get(req.user.id)) })
+})
+
+router.post('/me/wrapped', requireAuth, (req, res) => {
+  markWrappedSeen.run(req.user.id)
   res.json({ user: userToJson(findUserById.get(req.user.id)) })
 })
 

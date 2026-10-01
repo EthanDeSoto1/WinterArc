@@ -111,6 +111,42 @@ const migrations = [
   `
   ALTER TABLE users ADD COLUMN intro_seen INTEGER NOT NULL DEFAULT 0;
   `,
+  `
+  ALTER TABLE goals ADD COLUMN target REAL;
+  ALTER TABLE goals ADD COLUMN unit TEXT;
+  CREATE TABLE goal_amounts (
+    goal_id INTEGER NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+    logged_on TEXT NOT NULL,
+    amount REAL NOT NULL,
+    PRIMARY KEY (goal_id, logged_on)
+  );
+  CREATE TABLE cheers (
+    completion_id INTEGER NOT NULL REFERENCES completions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (completion_id, user_id)
+  );
+  CREATE INDEX cheers_user ON cheers (user_id);
+  CREATE TABLE milestones (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    goal_id INTEGER NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+    streak INTEGER NOT NULL,
+    reached_on TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE (goal_id, streak, reached_on)
+  );
+  CREATE INDEX milestones_user ON milestones (user_id);
+  CREATE TABLE app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+  ALTER TABLE posts ADD COLUMN edited_at TEXT;
+  ALTER TABLE users ADD COLUMN notify_cheers INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE users ADD COLUMN notify_threads INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE users ADD COLUMN notify_weekly_recap INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE users ADD COLUMN wrapped_seen INTEGER NOT NULL DEFAULT 0;
+  `,
 ]
 
 const currentVersion = db.pragma('user_version', { simple: true })

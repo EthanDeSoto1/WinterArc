@@ -13,6 +13,8 @@ import {
   buildHistory,
   finishedSeasonMonths,
   summarizeMonth,
+  summarizeWeek,
+  longestDailyRun,
 } from '../src/dates.js'
 
 test('today flips at local midnight, not UTC midnight', () => {
@@ -212,4 +214,26 @@ test('month summary has no percent when there were no daily goals', () => {
   const goals = [{ id: 1, frequency: 'weekly', timesPerWeek: 3, startDate: '2026-09-20', endDate: null, dates: ['2026-10-05'] }]
   const weeks = buildHistory(goals, '2026-10-01', '2026-12-31', '2026-11-10')
   assert.deepEqual(summarizeMonth(weeks, '2026-10'), { full: 0, partial: 0, low: 0, percent: null })
+})
+
+test('week summary counts this week so far, full days and weekly goals', () => {
+  const goals = [
+    { id: 1, frequency: 'daily', timesPerWeek: null, startDate: '2026-09-20', endDate: null, dates: ['2026-10-05', '2026-10-06', '2026-10-07'] },
+    { id: 2, frequency: 'daily', timesPerWeek: null, startDate: '2026-09-20', endDate: null, dates: ['2026-10-05'] },
+    { id: 3, frequency: 'weekly', timesPerWeek: 2, startDate: '2026-09-20', endDate: null, dates: ['2026-10-06', '2026-10-08'] },
+  ]
+  const weeks = buildHistory(goals, '2026-10-01', '2026-12-31', '2026-10-08')
+  const week = summarizeWeek(weeks, '2026-10-05')
+  assert.equal(week.fullDays, 1)
+  assert.equal(week.percent, 50)
+  assert.equal(week.weeklyMet, 1)
+  assert.equal(week.weeklyTotal, 1)
+  assert.deepEqual(summarizeWeek(weeks, '2027-01-04'), { percent: null, fullDays: 0, weeklyMet: 0, weeklyTotal: 0 })
+})
+
+test('longest daily run only counts days inside the range', () => {
+  const dates = ['2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07']
+  assert.equal(longestDailyRun(dates, '2026-10-01', '2026-12-31'), 4)
+  assert.equal(longestDailyRun([], '2026-10-01', '2026-12-31'), 0)
+  assert.equal(longestDailyRun(['2026-12-31', '2027-01-01'], '2026-10-01', '2026-12-31'), 1)
 })

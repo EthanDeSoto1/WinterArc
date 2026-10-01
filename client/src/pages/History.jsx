@@ -463,10 +463,20 @@ function FriendsMonthly() {
 }
 
 export default function History() {
+  const { user } = useAuth()
   const [view, setView] = useState('mine')
 
   return (
     <Page eyebrow="Winter Arc" title="History" wide>
+      {user.wrappedAvailable && (
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event('winterarc:wrapped'))}
+          className="mb-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-ice-300/25 bg-ice-300/[0.06] px-4 text-[15px] font-semibold text-ice-100 transition active:scale-[0.98] active:bg-ice-300/10 lg:max-w-sm"
+        >
+          Your season wrap-up
+        </button>
+      )}
       <div className="mb-6 lg:max-w-sm">
         <Segmented
           label="Whose history"

@@ -10,9 +10,12 @@ const REACTION_EMOJI = { fire: '🔥', muscle: '💪', clap: '👏' }
 const SETTING_COLUMNS = {
   posts: 'notify_posts',
   myPosts: 'notify_my_posts',
+  threads: 'notify_threads',
   friendDone: 'notify_friend_done',
   friendGoals: 'notify_friend_goals',
   friendRequests: 'notify_friend_requests',
+  cheers: 'notify_cheers',
+  weeklyRecap: 'notify_weekly_recap',
   remindMorning: 'remind_morning',
   remindMidday: 'remind_midday',
   remindEvening: 'remind_evening',
@@ -83,6 +86,21 @@ function readSetting(key, value) {
   return readSwitch(value)
 }
 
+const findOtherCommenters = db.prepare(`
+  SELECT DISTINCT users.id FROM post_comments
+  JOIN users ON users.id = post_comments.user_id
+  WHERE post_comments.post_id = ? AND users.id NOT IN (?, ?) AND users.notify_threads = 1
+`)
+
+export function goalsLeftText(goals) {
+  const titles = goals.map((goal) => goal.title)
+  const count = `${titles.length} ${titles.length === 1 ? 'goal' : 'goals'} left today`
+  if (titles.length <= 2) {
+    return `${count}: ${titles.join(' and ')}`
+  }
+  return `${count}: ${titles[0]}, ${titles[1]} and ${titles.length - 2} more`
+}
+
 function preview(text, length = 120) {
   return text.length > length ? `${text.slice(0, length - 1).trimEnd()}…` : text
 }
@@ -144,6 +162,43 @@ export function notifyComment(post, commenter, comment) {
     title: `${commenter.display_name} commented on your post`,
     body: preview(comment),
     url: '/board',
+  })
+}
+
+export function notifyThread(post, commenter, comment, canSee) {
+  const owner = findUser.get(post.user_id)
+  for (const reader of findOtherCommenters.all(post.id, commenter.id, owner.id)) {
+    if (!canSee(reader.id)) {
+      continue
+    }
+    sendToUser(reader.id, {
+      title: `${commenter.display_name} also commented on ${owner.display_name}’s post`,
+      body: preview(comment),
+      url: '/board',
+    })
+  }
+}
+
+export function notifyCheer(cheerer, ownerId, goalTitle) {
+  const owner = findUser.get(ownerId)
+  if (owner.notify_cheers !== 1) {
+    return
+  }
+  sendToUser(owner.id, {
+    title: `${cheerer.display_name} cheered you on`,
+    body: `For ${goalTitle}`,
+    url: '/friends',
+  })
+}
+
+export function notifyNudge(nudger, friend, goalsLeft) {
+  if (friend.notify_cheers !== 1) {
+    return
+  }
+  sendToUser(friend.id, {
+    title: `${nudger.display_name} nudged you`,
+    body: goalsLeftText(goalsLeft),
+    url: '/',
   })
 }
 

@@ -5,6 +5,7 @@ import { api } from '../api.js'
 import { syncPush } from '../push.js'
 import { Avatar } from './PersonRow.jsx'
 import Intro from './Intro.jsx'
+import Wrapped from './Wrapped.jsx'
 import { AccountIcon, BoardIcon, CalendarIcon, FriendsIcon, TodayIcon } from './Icons.jsx'
 
 const tabs = [
@@ -214,6 +215,7 @@ export default function Layout() {
   const [hasUnreadPosts, setHasUnreadPosts] = useState(false)
   const { user, setUser } = useAuth()
   const [introOpen, setIntroOpen] = useState(user.showIntro)
+  const [wrappedOpen, setWrappedOpen] = useState(user.showWrapped)
   const boardUnread = hasUnreadPosts && location.pathname !== '/board'
 
   useEffect(() => {
@@ -221,8 +223,15 @@ export default function Layout() {
     function handleIntro() {
       setIntroOpen(true)
     }
+    function handleWrapped() {
+      setWrappedOpen(true)
+    }
     window.addEventListener('winterarc:intro', handleIntro)
-    return () => window.removeEventListener('winterarc:intro', handleIntro)
+    window.addEventListener('winterarc:wrapped', handleWrapped)
+    return () => {
+      window.removeEventListener('winterarc:intro', handleIntro)
+      window.removeEventListener('winterarc:wrapped', handleWrapped)
+    }
   }, [])
 
   const closeIntro = useCallback(() => {
@@ -234,7 +243,16 @@ export default function Layout() {
     }
   }, [user.showIntro, setUser])
 
-  const intro = introOpen && <Intro onClose={closeIntro} />
+  const closeWrapped = useCallback(() => {
+    setWrappedOpen(false)
+    if (user.showWrapped) {
+      api('/me/wrapped', { method: 'POST' })
+        .then((data) => setUser(data.user))
+        .catch(() => {})
+    }
+  }, [user.showWrapped, setUser])
+
+  const intro = introOpen ? <Intro onClose={closeIntro} /> : wrappedOpen && <Wrapped onClose={closeWrapped} />
 
   useEffect(() => {
     let latestRequest = 0

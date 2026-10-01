@@ -10,6 +10,7 @@ import Account from './pages/Account.jsx'
 import Goals from './pages/Goals.jsx'
 import History from './pages/History.jsx'
 import Board from './pages/Board.jsx'
+import Profile from './pages/Profile.jsx'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="/history" element={<History />} />
               <Route path="/friends" element={<Friends />} />
               <Route path="/board" element={<Board />} />
+              <Route path="/people/:userId" element={<Profile />} />
               <Route path="/add-friend" element={<Navigate to="/friends?add=1" replace />} />
               <Route path="/account" element={<Account />} />
               <Route path="/settings" element={<Navigate to="/account" replace />} />

@@ -190,3 +190,40 @@ export function summarizeMonth(weeks, month) {
   }
   return { ...summary, percent: total === 0 ? null : Math.floor((done * 100) / total) }
 }
+
+export function summarizeWeek(weeks, monday) {
+  const week = weeks.find((item) => item.start === monday)
+  const summary = { percent: null, fullDays: 0, weeklyMet: 0, weeklyTotal: 0 }
+  if (!week) {
+    return summary
+  }
+  let done = 0
+  let total = 0
+  for (const day of week.days) {
+    if (!day.tracked || day.status === null) {
+      continue
+    }
+    done += day.done.length
+    total += day.done.length + day.missed.length
+    if (day.status === 'full') {
+      summary.fullDays++
+    }
+  }
+  summary.percent = total === 0 ? null : Math.floor((done * 100) / total)
+  summary.weeklyMet = week.goals.filter((goal) => goal.met).length
+  summary.weeklyTotal = week.goals.length
+  return summary
+}
+
+export function longestDailyRun(dates, from, to) {
+  const inRange = [...new Set(dates)].filter((date) => date >= from && date <= to).sort()
+  let best = 0
+  let run = 0
+  let previous = null
+  for (const date of inRange) {
+    run = previous !== null && addDays(previous, 1) === date ? run + 1 : 1
+    best = Math.max(best, run)
+    previous = date
+  }
+  return best
+}

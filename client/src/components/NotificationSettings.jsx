@@ -11,6 +11,7 @@ const GROUPS = [
     switches: [
       { key: 'posts', label: 'New posts on the Board' },
       { key: 'myPosts', label: 'Reactions and comments on my posts' },
+      { key: 'threads', label: 'Replies on posts I commented on' },
     ],
   },
   {
@@ -18,6 +19,7 @@ const GROUPS = [
     switches: [
       { key: 'friendDone', label: 'A friend finishes all of today’s goals' },
       { key: 'friendGoals', label: 'Every goal a friend checks off' },
+      { key: 'cheers', label: 'Cheers and nudges' },
       { key: 'friendRequests', label: 'Friend requests' },
     ],
   },
@@ -256,6 +258,8 @@ export default function NotificationSettings() {
                   onHourChange={(hour) => save(reminder.hourKey, hour)}
                 />
               ))}
+              <Switch label="Weekly recap · Sunday 7 PM" on={settings.weeklyRecap} onToggle={() => save('weeklyRecap', !settings.weeklyRecap)} />
+
             </div>
             <p className="mt-2 px-1 text-xs text-steel-500">In your profile’s timezone. Skipped when all of today’s goals are done.</p>
           </div>

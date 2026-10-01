@@ -5,7 +5,7 @@ import path from 'node:path'
 import db from './db.js'
 import { requireAuth } from './auth.js'
 import { notifyBoard, notifyBoardSeen } from './events.js'
-import { notifyNewPost, notifyReaction, notifyComment } from './push.js'
+import { notifyNewPost, notifyReaction, notifyComment, notifyThread } from './push.js'
 import { publicUser, areFriends } from './friends.js'
 import {
   readId,
@@ -26,11 +26,12 @@ const photoDir = process.env.PHOTO_DIR || path.join(path.dirname(db.name), 'phot
 fs.mkdirSync(photoDir, { recursive: true })
 
 const findPosts = db.prepare(`
-  SELECT posts.id, posts.body, posts.created_at, posts.photo, posts.photo_width, posts.photo_height,
+  SELECT posts.id, posts.body, posts.created_at, posts.edited_at, posts.photo, posts.photo_width, posts.photo_height,
     users.id AS user_id, users.username, users.display_name, users.avatar_color
   FROM posts
   JOIN users ON users.id = posts.user_id
   WHERE posts.id < ?
+    AND (? IS NULL OR posts.user_id = ?)
     AND (posts.user_id = ?
       OR posts.user_id IN (
         SELECT addressee_id FROM friendships WHERE requester_id = ? AND status = 'accepted'
@@ -41,7 +42,7 @@ const findPosts = db.prepare(`
   LIMIT ${PAGE_SIZE + 1}
 `)
 const findPost = db.prepare(`
-  SELECT posts.id, posts.body, posts.created_at, posts.photo, posts.photo_width, posts.photo_height,
+  SELECT posts.id, posts.body, posts.created_at, posts.edited_at, posts.photo, posts.photo_width, posts.photo_height,
     users.id AS user_id, users.username, users.display_name, users.avatar_color
   FROM posts
   JOIN users ON users.id = posts.user_id
@@ -75,6 +76,9 @@ const insertPhotoPost = db.prepare(
   'INSERT INTO posts (user_id, body, photo, photo_width, photo_height) VALUES (?, ?, ?, ?, ?)'
 )
 const deletePost = db.prepare('DELETE FROM posts WHERE id = ?')
+const updatePostBody = db.prepare(
+  "UPDATE posts SET body = ?, edited_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
+)
 const saveReaction = db.prepare(`
   INSERT INTO post_reactions (post_id, user_id, kind) VALUES (?, ?, ?)
   ON CONFLICT (post_id, user_id) DO UPDATE
@@ -105,6 +109,7 @@ function postsToJson(rows, viewer) {
     id: row.id,
     body: row.body,
     createdAt: row.created_at,
+    editedAt: row.edited_at,
     day: todayInTimezone(viewer.timezone, new Date(row.created_at)),
     isYours: row.user_id === viewer.id,
     photo: row.photo ? { width: row.photo_width, height: row.photo_height, version: row.photo.slice(0, 8) } : null,
@@ -170,7 +175,11 @@ router.get('/posts', requireAuth, (req, res) => {
   if (before.error) {
     return res.status(400).json({ error: before.error })
   }
-  const rows = findPosts.all(before.value, req.user.id, req.user.id, req.user.id)
+  const author = req.query.userId === undefined ? { value: null } : readId(req.query.userId, 'user')
+  if (author.error) {
+    return res.status(400).json({ error: author.error })
+  }
+  const rows = findPosts.all(before.value, author.value, author.value, req.user.id, req.user.id, req.user.id)
   const today = todayInTimezone(req.user.timezone)
   res.json({
     today,
@@ -274,6 +283,28 @@ router.delete('/posts/:id', requireAuth, (req, res) => {
   res.status(204).end()
 })
 
+router.patch('/posts/:id', requireAuth, (req, res) => {
+  const post = loadVisiblePost(req, res)
+  if (!post) {
+    return
+  }
+  if (post.user_id !== req.user.id) {
+    return res.status(403).json({ error: 'You can only edit your own posts' })
+  }
+  if (req.body.body === undefined) {
+    return res.status(400).json({ error: 'Nothing to update' })
+  }
+  const body = post.photo ? readCaption(req.body.body) : readPostBody(req.body.body)
+  if (body.error) {
+    return res.status(400).json({ error: body.error })
+  }
+  if (body.value !== post.body) {
+    updatePostBody.run(body.value, post.id)
+    notifyBoard(req.user.id)
+  }
+  res.json({ post: postsToJson([findPost.get(post.id)], req.user)[0] })
+})
+
 router.post('/posts/:id/comments', requireAuth, (req, res) => {
   const post = loadVisiblePost(req, res)
   if (!post) {
@@ -286,6 +317,7 @@ router.post('/posts/:id/comments', requireAuth, (req, res) => {
   insertComment.run(post.id, req.user.id, body.value)
   notifyBoard(post.user_id)
   notifyComment(post, req.user, body.value)
+  notifyThread(post, req.user, body.value, (readerId) => areFriends(post.user_id, readerId))
   res.status(201).json({ post: postsToJson([post], req.user)[0] })
 })
 

@@ -1,8 +1,15 @@
 import express from 'express'
 import db from './db.js'
-import { requireAuth } from './auth.js'
+import { requireAuth, wrappedAvailable } from './auth.js'
 import { publicUser } from './friends.js'
-import { todayInTimezone, seasonRange, buildHistory, finishedSeasonMonths, summarizeMonth } from './dates.js'
+import {
+  todayInTimezone,
+  seasonRange,
+  buildHistory,
+  finishedSeasonMonths,
+  summarizeMonth,
+  longestDailyRun,
+} from './dates.js'
 
 const findAllGoals = db.prepare('SELECT * FROM goals WHERE user_id = ? ORDER BY position, id')
 const findCompletions = db.prepare(`
@@ -24,7 +31,7 @@ function dateOf(timestamp, timezone) {
   return timestamp ? todayInTimezone(timezone, new Date(timestamp)) : null
 }
 
-function historyForUser(user) {
+export function historyForUser(user) {
   const today = todayInTimezone(user.timezone)
   const season = seasonRange(today)
   const completions = findCompletions.all(user.id)
@@ -77,6 +84,87 @@ function historyForUser(user) {
   }
 }
 
+const countSeasonPosts = db.prepare('SELECT count(*) AS count FROM posts WHERE user_id = ? AND created_at BETWEEN ? AND ?')
+const countReactionsReceived = db.prepare(`
+  SELECT count(*) AS count FROM post_reactions JOIN posts ON posts.id = post_reactions.post_id
+  WHERE posts.user_id = ? AND post_reactions.user_id <> ?
+`)
+const countCheersReceived = db.prepare(`
+  SELECT count(*) AS count FROM cheers JOIN completions ON completions.id = cheers.completion_id
+  WHERE completions.user_id = ?
+`)
+const countMilestones = db.prepare('SELECT count(*) AS count FROM milestones WHERE user_id = ? AND reached_on BETWEEN ? AND ?')
+
+function summarizeSeason(weeks, season) {
+  let done = 0
+  let total = 0
+  let fullDays = 0
+  for (const week of weeks) {
+    for (const day of week.days) {
+      if (day.date < season.start || day.date > season.end || !['full', 'partial', 'low'].includes(day.status)) {
+        continue
+      }
+      done += day.done.length
+      total += day.done.length + day.missed.length
+      if (day.status === 'full') {
+        fullDays++
+      }
+    }
+  }
+  return { percent: total === 0 ? null : Math.floor((done * 100) / total), fullDays }
+}
+
+function seasonWrapped(viewer) {
+  const today = todayInTimezone(viewer.timezone)
+  const season = seasonRange(today)
+  const history = historyForUser(viewer)
+  const completions = findCompletions.all(viewer.id).filter((row) => row.completed_on >= season.start && row.completed_on <= season.end)
+  const goals = findAllGoals.all(viewer.id)
+
+  let bestStreak = { days: 0, goal: null }
+  for (const goal of goals.filter((item) => item.frequency === 'daily')) {
+    const dates = completions.filter((row) => row.goal_id === goal.id).map((row) => row.completed_on)
+    const days = longestDailyRun(dates, season.start, season.end)
+    if (days > bestStreak.days) {
+      bestStreak = { days, goal: goal.title }
+    }
+  }
+
+  const months = ['10', '11', '12'].map((month) => {
+    const key = `${season.start.slice(0, 4)}-${month}`
+    return { month: key, percent: summarizeMonth(history.weeks, key).percent }
+  })
+  const bestMonth = months
+    .filter((item) => item.percent !== null)
+    .reduce((best, item) => (best === null || item.percent > best.percent ? item : best), null)
+
+  const mine = summarizeSeason(history.weeks, season)
+  const friends = findFriendsWithDetails.all(viewer.id, viewer.id)
+  let rank = null
+  if (mine.percent !== null && friends.length > 0) {
+    const percents = friends
+      .map((friend) => summarizeSeason(historyForUser(friend).weeks, season).percent)
+      .filter((percent) => percent !== null)
+    rank = { place: 1 + percents.filter((percent) => percent > mine.percent).length, of: percents.length + 1 }
+  }
+
+  const from = `${season.start}T00:00:00.000Z`
+  const to = `${season.end}T23:59:59.999Z`
+  return {
+    season,
+    checkoffs: completions.length,
+    percent: mine.percent,
+    fullDays: mine.fullDays,
+    bestStreak,
+    bestMonth,
+    rank,
+    posts: countSeasonPosts.get(viewer.id, from, to).count,
+    reactions: countReactionsReceived.get(viewer.id, viewer.id).count,
+    cheers: countCheersReceived.get(viewer.id).count,
+    milestones: countMilestones.get(viewer.id, season.start, season.end).count,
+  }
+}
+
 function comparePeople(a, b) {
   if (a.percent !== b.percent) {
     if (a.percent === null) {
@@ -115,6 +203,13 @@ const router = express.Router()
 
 router.get('/history', requireAuth, (req, res) => {
   res.json(historyForUser(req.user))
+})
+
+router.get('/wrapped', requireAuth, (req, res) => {
+  if (!wrappedAvailable(req.user)) {
+    return res.status(404).json({ error: 'Your wrap-up opens on January 1' })
+  }
+  res.json(seasonWrapped(req.user))
 })
 
 router.get('/history/friends', requireAuth, (req, res) => {

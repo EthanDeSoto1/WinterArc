@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { api } from '../api.js'
 import { Avatar } from './PersonRow.jsx'
 import { GoalMeta } from './GoalRow.jsx'
@@ -55,7 +56,7 @@ function FriendGoalRow({ goal }) {
   )
 }
 
-function FriendGoalList({ label, goals }) {
+export function FriendGoalList({ label, goals }) {
   if (goals.length === 0) {
     return null
   }
@@ -68,6 +69,53 @@ function FriendGoalList({ label, goals }) {
         ))}
       </ul>
     </div>
+  )
+}
+
+function NudgeButton({ friend }) {
+  const [nudged, setNudged] = useState(friend.nudged)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setNudged(friend.nudged)
+  }, [friend.nudged])
+
+  async function nudge() {
+    setSending(true)
+    setError('')
+    try {
+      await api(`/friends/${friend.id}/nudge`, { method: 'POST' })
+      setNudged(true)
+    } catch (nudgeError) {
+      if (nudgeError.status === 409 && /already nudged/.test(nudgeError.message)) {
+        setNudged(true)
+      } else {
+        setError(nudgeError.message)
+      }
+    }
+    setSending(false)
+  }
+
+  if (friend.today.total === 0 || friend.today.done === friend.today.total) {
+    return null
+  }
+  if (nudged) {
+    return <span className="flex min-h-11 shrink-0 items-center px-2 text-xs font-medium text-steel-500">Nudged</span>
+  }
+  return (
+    <button
+      type="button"
+      onClick={nudge}
+      disabled={sending}
+      title={error || `Nudge ${friend.displayName}`}
+      aria-label={error ? `Nudge ${friend.displayName}. ${error}` : `Nudge ${friend.displayName}`}
+      className={`my-2 flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold transition active:scale-[0.97] disabled:opacity-40 ${
+        error ? 'border-rose-400/30 text-rose-200' : 'border-white/10 text-steel-200 active:bg-white/5 lg:hover:border-ice-300/30'
+      }`}
+    >
+      {error ? 'Retry' : 'Nudge'}
+    </button>
   )
 }
 
@@ -116,21 +164,24 @@ export default function FriendCard({ friend }) {
 
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-ink-900/70 shadow-[inset_0_1px_0_rgb(255_255_255/0.03)] transition lg:hover:border-ice-300/25 lg:hover:shadow-[0_12px_40px_-20px_rgb(132_197_255/0.6)]">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={open}
-        aria-controls={panelId}
-        className="flex min-h-[4.25rem] w-full items-center gap-3 rounded-2xl py-2 pr-3 pl-3 text-left transition active:bg-white/[0.03] lg:hover:bg-white/[0.02]"
-      >
-        <Avatar user={friend} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-medium text-ice-50">{friend.displayName}</span>
-          <span className="block truncate text-xs text-steel-500">@{friend.username}</span>
-        </span>
-        <TodaySummary today={friend.today} />
-        <ChevronDownIcon className={`size-5 shrink-0 text-steel-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-      </button>
+      <div className="flex items-center gap-1 pr-2">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className="flex min-h-[4.25rem] min-w-0 flex-1 items-center gap-3 rounded-2xl py-2 pr-1 pl-3 text-left transition active:bg-white/[0.03] lg:hover:bg-white/[0.02]"
+        >
+          <Avatar user={friend} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-medium text-ice-50">{friend.displayName}</span>
+            <span className="block truncate text-xs text-steel-500">@{friend.username}</span>
+          </span>
+          <TodaySummary today={friend.today} />
+          <ChevronDownIcon className={`size-5 shrink-0 text-steel-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </button>
+        <NudgeButton friend={friend} />
+      </div>
 
       {open && (
         <div id={panelId} className="animate-fade-up border-t border-white/[0.06] p-3">
@@ -149,6 +200,14 @@ export default function FriendCard({ friend }) {
               <FriendGoalList label="Daily" goals={goals.filter((goal) => goal.frequency === 'daily')} />
               <FriendGoalList label="Weekly" goals={goals.filter((goal) => goal.frequency === 'weekly')} />
             </div>
+          )}
+          {status === 'ready' && (
+            <Link
+              to={`/people/${friend.id}`}
+              className="mt-3 flex min-h-11 items-center justify-center rounded-xl border border-white/10 text-sm font-medium text-steel-200 transition active:bg-white/5 lg:hover:border-ice-300/30"
+            >
+              View profile
+            </Link>
           )}
         </div>
       )}
