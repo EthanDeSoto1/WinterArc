@@ -64,6 +64,14 @@ const findComments = db.prepare(`
   WHERE post_comments.post_id IN (SELECT value FROM json_each(?))
   ORDER BY post_comments.id
 `)
+const findCommentReactions = db.prepare(`
+  SELECT comment_reactions.comment_id, comment_reactions.kind,
+    users.id, users.username, users.display_name, users.avatar_color
+  FROM comment_reactions
+  JOIN users ON users.id = comment_reactions.user_id
+  WHERE comment_reactions.comment_id IN (SELECT value FROM json_each(?))
+  ORDER BY comment_reactions.created_at, comment_reactions.user_id
+`)
 const findComment = db.prepare('SELECT * FROM post_comments WHERE id = ? AND post_id = ?')
 const insertComment = db.prepare('INSERT INTO post_comments (post_id, user_id, body) VALUES (?, ?, ?)')
 const deleteComment = db.prepare('DELETE FROM post_comments WHERE id = ?')
@@ -119,6 +127,15 @@ const markBoardSeen = db.prepare(
 const markCommentsSeen = db.prepare(
   'UPDATE users SET board_seen_comment_id = ? WHERE id = ? AND board_seen_comment_id < ? AND ? <= (SELECT coalesce(max(id), 0) FROM post_comments)'
 )
+const saveCommentReaction = db.prepare(`
+  INSERT INTO comment_reactions (comment_id, user_id, kind) VALUES (?, ?, ?)
+  ON CONFLICT (comment_id, user_id) DO UPDATE
+    SET kind = excluded.kind, created_at = excluded.created_at
+    WHERE kind <> excluded.kind
+`)
+const deleteCommentReaction = db.prepare(
+  'DELETE FROM comment_reactions WHERE comment_id = ? AND user_id = ? AND kind = ?'
+)
 const findMyReaction = db.prepare('SELECT kind FROM post_reactions WHERE post_id = ? AND user_id = ?')
 const deleteReaction = db.prepare('DELETE FROM post_reactions WHERE post_id = ? AND user_id = ? AND kind = ?')
 
@@ -126,6 +143,7 @@ function postsToJson(rows, viewer) {
   const postIds = JSON.stringify(rows.map((row) => row.id))
   const reactionRows = findReactions.all(postIds)
   const commentRows = findComments.all(postIds)
+  const commentReactionRows = findCommentReactions.all(JSON.stringify(commentRows.map((comment) => comment.id)))
   return rows.map((row) => ({
     id: row.id,
     body: row.body,
@@ -153,6 +171,15 @@ function postsToJson(rows, viewer) {
         day: todayInTimezone(viewer.timezone, new Date(comment.created_at)),
         isYours: comment.user_id === viewer.id,
         canDelete: comment.user_id === viewer.id || row.user_id === viewer.id,
+        reactions: REACTION_KINDS.map((kind) => {
+          const people = commentReactionRows.filter((reaction) => reaction.comment_id === comment.id && reaction.kind === kind)
+          return {
+            kind,
+            count: people.length,
+            mine: people.some((person) => person.id === viewer.id),
+            people: people.map(publicUser),
+          }
+        }),
         user: { id: comment.user_id, username: comment.username, displayName: comment.display_name, avatarColor: comment.avatar_color },
       })),
   }))
@@ -367,6 +394,53 @@ router.delete('/posts/:id/comments/:commentId', requireAuth, (req, res) => {
   deleteComment.run(comment.id)
   notifyBoard(post.user_id)
   res.json({ post: postsToJson([post], req.user)[0] })
+})
+
+function loadCommentReactionTarget(req, res) {
+  const kind = readReactionKind(req.params.kind)
+  if (kind.error) {
+    res.status(400).json({ error: kind.error })
+    return null
+  }
+  const post = loadVisiblePost(req, res)
+  if (!post) {
+    return null
+  }
+  const commentId = readId(req.params.commentId, 'comment')
+  if (commentId.error) {
+    res.status(400).json({ error: commentId.error })
+    return null
+  }
+  const comment = findComment.get(commentId.value, post.id)
+  if (!comment) {
+    res.status(404).json({ error: 'That comment no longer exists' })
+    return null
+  }
+  return { post, comment, kind: kind.value }
+}
+
+router.put('/posts/:id/comments/:commentId/reactions/:kind', requireAuth, (req, res) => {
+  const target = loadCommentReactionTarget(req, res)
+  if (!target) {
+    return
+  }
+  const result = saveCommentReaction.run(target.comment.id, req.user.id, target.kind)
+  if (result.changes === 1) {
+    notifyBoard(target.post.user_id)
+  }
+  res.json({ post: postsToJson([target.post], req.user)[0] })
+})
+
+router.delete('/posts/:id/comments/:commentId/reactions/:kind', requireAuth, (req, res) => {
+  const target = loadCommentReactionTarget(req, res)
+  if (!target) {
+    return
+  }
+  const result = deleteCommentReaction.run(target.comment.id, req.user.id, target.kind)
+  if (result.changes === 1) {
+    notifyBoard(target.post.user_id)
+  }
+  res.json({ post: postsToJson([target.post], req.user)[0] })
 })
 
 router.put('/posts/:id/reactions/:kind', requireAuth, (req, res) => {

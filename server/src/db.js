@@ -151,6 +151,16 @@ const migrations = [
   ALTER TABLE users ADD COLUMN board_seen_comment_id INTEGER NOT NULL DEFAULT 0;
   UPDATE users SET board_seen_comment_id = (SELECT coalesce(max(id), 0) FROM post_comments);
   `,
+  `
+  CREATE TABLE comment_reactions (
+    comment_id INTEGER NOT NULL REFERENCES post_comments(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('fire', 'muscle', 'clap')),
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (comment_id, user_id)
+  );
+  CREATE INDEX comment_reactions_user ON comment_reactions (user_id);
+  `,
 ]
 
 const currentVersion = db.pragma('user_version', { simple: true })

@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useAuth } from '../AuthContext.jsx'
 import { api } from '../api.js'
 import { Avatar } from './PersonRow.jsx'
 import { SmallButton } from './Form.jsx'
 import { CrossIcon } from './Icons.jsx'
 import { formatPostedWhen } from '../dates.js'
+import { REACTIONS, chooseReaction, reactionLabel } from '../reactions.js'
 
 const MAX_WORDS = 100
 const SHOWN_COMMENTS = 3
@@ -13,6 +15,8 @@ function countWords(text) {
 }
 
 export default function PostComments({ post, board, timezone, onChange, onError }) {
+  const { user } = useAuth()
+  const me = { id: user.id, username: user.username, displayName: user.displayName, avatarColor: user.avatarColor }
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -32,6 +36,24 @@ export default function PostComments({ post, board, timezone, onChange, onError 
       onError(error.message)
     }
     setSending(false)
+  }
+
+  async function handleReact(comment, kind) {
+    const reaction = comment.reactions.find((item) => item.kind === kind)
+    const optimistic = {
+      ...post,
+      comments: post.comments.map((item) => (item.id === comment.id ? chooseReaction(item, kind, me) : item)),
+    }
+    onChange(optimistic)
+    try {
+      const data = await api(`/posts/${post.id}/comments/${comment.id}/reactions/${kind}`, {
+        method: reaction.mine ? 'DELETE' : 'PUT',
+      })
+      onChange(data.post)
+    } catch (error) {
+      onChange(post)
+      onError(error.message)
+    }
   }
 
   async function handleDelete(comment) {
@@ -68,6 +90,31 @@ export default function PostComments({ post, board, timezone, onChange, onError 
                   <time dateTime={comment.createdAt}>{formatPostedWhen(comment.createdAt, comment.day, board, timezone)}</time>
                 </p>
                 <p className="mt-0.5 text-sm leading-snug break-words text-steel-200">{comment.body}</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {comment.reactions.map((reaction) => {
+                    const info = REACTIONS.find((item) => item.kind === reaction.kind)
+                    return (
+                      <button
+                        key={reaction.kind}
+                        type="button"
+                        onClick={() => handleReact(comment, reaction.kind)}
+                        aria-pressed={reaction.mine}
+                        aria-label={reactionLabel(info, reaction, me)}
+                        title={reaction.people.length > 0 ? reactionLabel(info, reaction, me).split(': ')[1] : undefined}
+                        className={`flex min-h-8 items-center justify-center gap-1 rounded-full border px-2.5 text-xs font-semibold tabular-nums transition active:scale-95 ${
+                          reaction.mine
+                            ? 'border-ice-300/40 bg-ice-300/[0.1] text-ice-100'
+                            : 'border-white/[0.08] text-steel-400 active:bg-white/5'
+                        }`}
+                      >
+                        <span aria-hidden="true" className="text-sm">
+                          {info.emoji}
+                        </span>
+                        {reaction.count > 0 && <span aria-hidden="true">{reaction.count}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
               {comment.canDelete && (
                 <button

@@ -10,43 +10,11 @@ import { SmallButton } from './Form.jsx'
 import { CrossIcon } from './Icons.jsx'
 import { ErrorState, LoadingState, Toast } from './States.jsx'
 import { formatPostedWhen } from '../dates.js'
+import { REACTIONS, chooseReaction, reactionLabel } from '../reactions.js'
 
 const MAX_FACES = 3
 const MAX_LENGTH = 500
 const CLOSE_DISTANCE = 100
-
-const REACTIONS = [
-  { kind: 'fire', emoji: '🔥', label: 'Fire' },
-  { kind: 'muscle', emoji: '💪', label: 'Strong' },
-  { kind: 'clap', emoji: '👏', label: 'Applause' },
-]
-
-function withoutMe(reaction, me) {
-  return { ...reaction, mine: false, count: reaction.count - 1, people: reaction.people.filter((person) => person.id !== me.id) }
-}
-
-function chooseReaction(post, kind, me) {
-  return {
-    ...post,
-    reactions: post.reactions.map((reaction) => {
-      if (reaction.kind === kind && reaction.mine) {
-        return withoutMe(reaction, me)
-      }
-      if (reaction.kind === kind) {
-        return { ...reaction, mine: true, count: reaction.count + 1, people: [...reaction.people, me] }
-      }
-      if (reaction.mine) {
-        return withoutMe(reaction, me)
-      }
-      return reaction
-    }),
-  }
-}
-
-function reactionLabel(info, reaction, me) {
-  const names = reaction.people.map((person) => (person.id === me.id ? 'you' : person.displayName))
-  return names.length === 0 ? `${info.label}, 0` : `${info.label}, ${names.length}: ${names.join(', ')}`
-}
 
 function photoAlt(post) {
   return `Photo from ${post.isYours ? 'you' : post.user.displayName}`
