@@ -153,6 +153,18 @@ export function notifyReaction(post, reactor, kind) {
   })
 }
 
+export function notifyCommentReaction(comment, reactor, kind) {
+  const owner = findUser.get(comment.user_id)
+  if (owner.id === reactor.id || owner.notify_my_posts !== 1) {
+    return
+  }
+  sendToUser(owner.id, {
+    title: `${reactor.display_name} reacted ${REACTION_EMOJI[kind]} to your comment`,
+    body: preview(comment.body),
+    url: '/board',
+  })
+}
+
 export function notifyComment(post, commenter, comment) {
   const owner = findUser.get(post.user_id)
   if (owner.id === commenter.id || owner.notify_my_posts !== 1) {

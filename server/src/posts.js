@@ -5,7 +5,7 @@ import path from 'node:path'
 import db from './db.js'
 import { requireAuth } from './auth.js'
 import { notifyBoard, notifyBoardSeen } from './events.js'
-import { notifyNewPost, notifyReaction, notifyComment, notifyThread } from './push.js'
+import { notifyNewPost, notifyReaction, notifyCommentReaction, notifyComment, notifyThread } from './push.js'
 import { publicUser, areFriends } from './friends.js'
 import {
   readId,
@@ -133,6 +133,7 @@ const saveCommentReaction = db.prepare(`
     SET kind = excluded.kind, created_at = excluded.created_at
     WHERE kind <> excluded.kind
 `)
+const findMyCommentReaction = db.prepare('SELECT kind FROM comment_reactions WHERE comment_id = ? AND user_id = ?')
 const deleteCommentReaction = db.prepare(
   'DELETE FROM comment_reactions WHERE comment_id = ? AND user_id = ? AND kind = ?'
 )
@@ -424,9 +425,13 @@ router.put('/posts/:id/comments/:commentId/reactions/:kind', requireAuth, (req, 
   if (!target) {
     return
   }
+  const hadReaction = findMyCommentReaction.get(target.comment.id, req.user.id) !== undefined
   const result = saveCommentReaction.run(target.comment.id, req.user.id, target.kind)
   if (result.changes === 1) {
     notifyBoard(target.post.user_id)
+  }
+  if (result.changes === 1 && !hadReaction) {
+    notifyCommentReaction(target.comment, req.user, target.kind)
   }
   res.json({ post: postsToJson([target.post], req.user)[0] })
 })
